@@ -37,9 +37,7 @@ JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # fallback 5 min
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".aiff", ".mp4"}
 
-app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH_MB * 1024 * 1024
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
