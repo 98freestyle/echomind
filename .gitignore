@@ -1,0 +1,29 @@
+# Python venv
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# Logs, temp, uploads
+logs/
+temp/
+uploads/
+
+# Test outputs
+tests/
+
+# Node.js
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# OS-specific
+.DS_Store
+Thumbs.db
