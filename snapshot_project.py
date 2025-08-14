@@ -4,10 +4,17 @@ BASE_DIR = os.getcwd()
 OUTPUT_FILE = "clean_snapshot.txt"
 
 # Core files to always include fully
+# Core files to always include fully
 CORE_FILES = {
+    # Backend core
     "backend/app.py",
     "backend/audio_splitter.py",
     "backend/requirements.txt",
+    "backend/db/init_db.py",        # DB init script
+    "backend/db/users.db",          # SQLite DB file
+    "backend/test.mp3",             # Test media (so I see what you’re using)
+
+    # Frontend core
     "frontend/src/api.js",
     "frontend/src/App.jsx",
     "frontend/src/main.jsx",
@@ -20,10 +27,17 @@ CORE_FILES = {
     "frontend/package.json",
     "frontend/tailwind.config.js",
     "frontend/postcss.config.js",
+
+    # Project meta
     "INSTRUCTIONS.md",
     "packages_list.txt",
-    ".env"
+    ".env",
+
+    # Utility / scripts
+    "snapshot_project.py",
+    "clean_snapshot.txt"
 }
+
 
 # Folders to show but NOT list contents
 SKIP_LISTING = {

@@ -16,8 +16,11 @@ GLOBAL_MAX_JOBS=4
 JOB_EXPIRATION=300
 
 ------------------------------------------------------------
-  clean_snapshot.txt
-  clean_snapshot08_08_25.txt
+  .gitignore
+
+## 📄 clean_snapshot.txt
+
+------------------------------------------------------------
 
 ## 📄 INSTRUCTIONS.md
 
@@ -133,10 +136,266 @@ EchoMind/
 
 ------------------------------------------------------------
 
-## 📄 packages_list.txt
-[Unreadable file]
+## 📄 snapshot_project.py
+import os
+
+BASE_DIR = os.getcwd()
+OUTPUT_FILE = "clean_snapshot.txt"
+
+# Core files to always include fully
+# Core files to always include fully
+CORE_FILES = {
+    # Backend core
+    "backend/app.py",
+    "backend/audio_splitter.py",
+    "backend/requirements.txt",
+    "backend/db/init_db.py",        # DB init script
+    "backend/db/users.db",          # SQLite DB file
+    "backend/test.mp3",             # Test media (so I see what you’re using)
+
+    # Frontend core
+    "frontend/src/api.js",
+    "frontend/src/App.jsx",
+    "frontend/src/main.jsx",
+    "frontend/src/index.css",
+    "frontend/src/components/Navbar.jsx",
+    "frontend/src/components/Hero.jsx",
+    "frontend/src/components/UploadForm.jsx",
+    "frontend/src/components/Faq.jsx",
+    "frontend/index.html",
+    "frontend/package.json",
+    "frontend/tailwind.config.js",
+    "frontend/postcss.config.js",
+
+    # Project meta
+    "INSTRUCTIONS.md",
+    "packages_list.txt",
+    ".env",
+
+    # Utility / scripts
+    "snapshot_project.py",
+    "clean_snapshot.txt"
+}
+
+
+# Folders to show but NOT list contents
+SKIP_LISTING = {
+    os.path.join("backend", "logs"),
+    os.path.join("backend", "temp"),
+    os.path.join("backend", "uploads"),
+    os.path.join("tests", "reports")
+}
+
+IGNORE_DIRS = {"node_modules", "venv", "__pycache__"}
+
+with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
+    out.write("# 📂 Project Structure\n")
+
+    for root, dirs, files in os.walk(BASE_DIR):
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+        rel_root = os.path.relpath(root, BASE_DIR)
+
+        out.write(f"\n# 📁 {rel_root}\n")
+
+        if any(rel_root.startswith(skip) for skip in SKIP_LISTING):
+            out.write("  [Contents skipped]\n")
+            continue
+
+        for file in files:
+            rel_path = os.path.normpath(os.path.join(rel_root, file))
+            rel_path_unix = rel_path.replace("\\", "/")
+
+            if rel_path_unix in CORE_FILES:
+                out.write(f"\n## 📄 {rel_path_unix}\n")
+                try:
+                    with open(os.path.join(root, file), "r", encoding="utf-8") as f:
+                        out.write(f.read())
+                except:
+                    out.write("[Unreadable file]")
+                out.write("\n" + "-"*60 + "\n")
+            else:
+                out.write(f"  {file}\n")
+
+print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
+
 ------------------------------------------------------------
-  snapshot_project.py
+
+# 📁 .git
+  COMMIT_EDITMSG
+  config
+  description
+  HEAD
+  index
+
+# 📁 .git\hooks
+  applypatch-msg.sample
+  commit-msg.sample
+  fsmonitor-watchman.sample
+  post-update.sample
+  pre-applypatch.sample
+  pre-commit.sample
+  pre-merge-commit.sample
+  pre-push.sample
+  pre-rebase.sample
+  pre-receive.sample
+  prepare-commit-msg.sample
+  push-to-checkout.sample
+  sendemail-validate.sample
+  update.sample
+
+# 📁 .git\info
+  exclude
+
+# 📁 .git\logs
+  HEAD
+
+# 📁 .git\logs\refs
+
+# 📁 .git\logs\refs\heads
+  main
+
+# 📁 .git\logs\refs\remotes
+
+# 📁 .git\logs\refs\remotes\origin
+  main
+
+# 📁 .git\objects
+
+# 📁 .git\objects\03
+  391a5fc723bcabb13292cc7fdd296519621688
+  fb12dc0fe5fa8dd98f5a9a0b55e1f1eff7aa0d
+
+# 📁 .git\objects\0e
+  0aad7bbd0f358353ac4bd94ae02fb6f179249d
+
+# 📁 .git\objects\14
+  3147dcae09c34b04b1455afc7c0289e793a981
+  77e14cc9bb30146958d1731b51159a0058fb59
+  cf1b8658b7c360418950bb7f8ef541b19ea624
+
+# 📁 .git\objects\1b
+  9b77fca2740dd5e09e7f6b664da282f33d3076
+
+# 📁 .git\objects\22
+  5d8efdaaecd08da028fa24461fffb3efed7c0a
+
+# 📁 .git\objects\24
+  b79496d24a73b7aacaa101f2245e84ba314370
+
+# 📁 .git\objects\33
+  ad091d26d8a9dc95ebdf616e217d985ec215b8
+
+# 📁 .git\objects\46
+  119b5f64d3313837c3a7effce0bdf925d486bd
+
+# 📁 .git\objects\49
+  1007bf22fdd919a1648aeb1e544c94ef29d4d4
+
+# 📁 .git\objects\4c
+  ffc0accc9d352c586d092a5a846473bce2468b
+
+# 📁 .git\objects\50
+  cb1b8ff47881c8b567dce575d10f2a50743625
+
+# 📁 .git\objects\51
+  4a6b64e2daca5a9532010e28eb0836ca7590a5
+
+# 📁 .git\objects\54
+  3adedc82e5fb30355e9f6a26f49b2260eb6696
+
+# 📁 .git\objects\59
+  799b03487db9800ebae7b5236aa86ee5a2effa
+
+# 📁 .git\objects\5c
+  79bc083132fc9b16a3a84aeb713d25fe2117a8
+
+# 📁 .git\objects\5e
+  71adbf28597442e55e8d740f46b73b099d4ed7
+
+# 📁 .git\objects\5f
+  b75858c26d3feca05c2ceea4be425e3f342c1b
+
+# 📁 .git\objects\65
+  f4794109433dd2526c37bb905d9abcb4839be0
+
+# 📁 .git\objects\6b
+  af00a22f435274cc535f43392ab8ae12b8b1a2
+
+# 📁 .git\objects\6c
+  6ec4373ae28e4252aab43ff82e9703650097e6
+
+# 📁 .git\objects\73
+  341a2dde0b9b273ed7a46b18b0fa1d8595b2b3
+
+# 📁 .git\objects\74
+  c8547238297b7705a9646ecde4951a5e834706
+
+# 📁 .git\objects\82
+  397b32f876864244bb8618e952f9e3642e5aad
+
+# 📁 .git\objects\84
+  7006c4a6b92beb4820534b315b1e2a78af8bec
+
+# 📁 .git\objects\8d
+  8f7dffa5b30c55d3d520c2073903e2d512cad7
+
+# 📁 .git\objects\9c
+  ba089177d520973c13d0f538a9808cb56d67e9
+
+# 📁 .git\objects\9f
+  495b335313ca23ae14b267fe5aa2941edce7af
+
+# 📁 .git\objects\a1
+  7aead092b946bef40273d68a066300ede05c04
+
+# 📁 .git\objects\b2
+  47b4b1f65f62f26cda428a6ac643d4a66bf0ff
+
+# 📁 .git\objects\bd
+  6213e1dfe6b0a79ce7d8b37d0d2dc70f0250bb
+
+# 📁 .git\objects\c2
+  8d1ead1847a5bb18103ed252afde2ec11be5cf
+
+# 📁 .git\objects\cd
+  a1279e35c9255806161f05568df09404f1ebfc
+
+# 📁 .git\objects\ce
+  b870278ffd9bc0a4dd695a7afae0f536594cca
+
+# 📁 .git\objects\d3
+  96a4b95c2b54d2a53e0fbd317202678ceecadc
+
+# 📁 .git\objects\e5
+  96e41bf9a46055b41bfe2ae82f3927a0bfd2c3
+
+# 📁 .git\objects\e6
+  9de29bb2d1d6434b8b29ae775ad8c2e48c5391
+
+# 📁 .git\objects\e8
+  4bfb1a3e3252b3a922d9358cbe0bf872931c7b
+
+# 📁 .git\objects\eb
+  cd6ff325e804eda13f99346bfd62d319516b56
+
+# 📁 .git\objects\f7
+  ad003c99914f5541a8ea72ccd2c3e7c9c296fb
+
+# 📁 .git\objects\info
+
+# 📁 .git\objects\pack
+
+# 📁 .git\refs
+
+# 📁 .git\refs\heads
+  main
+
+# 📁 .git\refs\remotes
+
+# 📁 .git\refs\remotes\origin
+  main
+
+# 📁 .git\refs\tags
 
 # 📁 backend
 
@@ -180,9 +439,7 @@ JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # fallback 5 min
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".aiff", ".mp4"}
 
-app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH_MB * 1024 * 1024
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
@@ -567,31 +824,37 @@ def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None
     return output_path
 
 ------------------------------------------------------------
+  packages_list.txt
 
 ## 📄 backend/requirements.txt
 
 ------------------------------------------------------------
-  test.mp3
+
+## 📄 backend/test.mp3
+[Unreadable file]
+------------------------------------------------------------
 
 # 📁 backend\db
-  init_db.py
-  users.db
+
+## 📄 backend/db/init_db.py
+import sqlite3
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(BASE_DIR, "users.db")
+
+conn = sqlite3.connect(db_path)
+
+------------------------------------------------------------
+
+## 📄 backend/db/users.db
+
+------------------------------------------------------------
 
 # 📁 backend\logs
   [Contents skipped]
 
-# 📁 backend\stems
-
-# 📁 backend\stems\htdemucs
-
-# 📁 backend\stems\htdemucs\test
-  no_vocals.wav
-  vocals.wav
-
 # 📁 backend\temp
-  [Contents skipped]
-
-# 📁 backend\uploads
   [Contents skipped]
 
 # 📁 frontend
@@ -1251,5 +1514,3 @@ export default function UploadForm() {
 # 📁 tests\separated
 
 # 📁 tests\separated\htdemucs
-
-# 📁 uploads

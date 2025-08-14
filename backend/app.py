@@ -2,7 +2,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes
+import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt
 from flask import Flask, request, send_file, render_template, Response, jsonify, make_response
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
@@ -335,6 +335,37 @@ def preview(job_id, stem):
     if os.path.exists(path):
         return send_file(path, mimetype="audio/mpeg")
     return jsonify({"error": "Stem not found."}), 404
+
+
+# SIGNUP
+@app.route("/signup", methods=["POST"])
+@cross_origin()
+def signup():
+    data = request.json
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not username or not email or not password:
+        return jsonify({"error": "All fields are required."}), 400
+
+    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                  (username, email, hashed_pw))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True}), 201
+    except sqlite3.IntegrityError as e:
+        return jsonify({"error": "Username or email already exists."}), 409
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_file(e):
