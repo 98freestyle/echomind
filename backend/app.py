@@ -367,6 +367,40 @@ def signup():
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
+# LOGIN
+@app.route("/login", methods=["POST"])
+@cross_origin()
+def login():
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Email and password required."}), 400
+
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT password FROM users WHERE email = ?", (email,))
+        result = c.fetchone()
+        conn.close()
+
+        if not result:
+            return jsonify({"error": "Invalid credentials."}), 401
+
+        stored_pw = result[0]
+        if not bcrypt.checkpw(password.encode("utf-8"), stored_pw.encode("utf-8")):
+            return jsonify({"error": "Invalid credentials."}), 401
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_file(e):
     return jsonify({"error": f"File too large. Max {MAX_CONTENT_LENGTH_MB}MB."}), 413
