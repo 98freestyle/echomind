@@ -164,6 +164,9 @@ CORE_FILES = {
     "frontend/src/components/Faq.jsx",
     "frontend/src/components/Login.jsx",
     "frontend/src/components/Signup.jsx",
+    "frontend/src/components/ProtectedRoute.jsx",
+    "frontend/src/components/Dashboard.jsx",
+    "frontend/src/context/AuthContext.jsx",
     "frontend/index.html",
     "frontend/package.json",
     "frontend/tailwind.config.js",
@@ -221,6 +224,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
 print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 ------------------------------------------------------------
+  test_user_info.txt
 
 # 📁 .git
   COMMIT_EDITMSG
@@ -263,12 +267,21 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects
 
+# 📁 .git\objects\00
+  93deab8267a57425408ff4a78c86035142c3ef
+
 # 📁 .git\objects\03
   391a5fc723bcabb13292cc7fdd296519621688
   fb12dc0fe5fa8dd98f5a9a0b55e1f1eff7aa0d
 
+# 📁 .git\objects\04
+  5814436385fec0c897b700b88723637335c4f6
+
 # 📁 .git\objects\0e
   0aad7bbd0f358353ac4bd94ae02fb6f179249d
+
+# 📁 .git\objects\11
+  69f935621d2b3addc99107422f8a5077894045
 
 # 📁 .git\objects\14
   3147dcae09c34b04b1455afc7c0289e793a981
@@ -286,6 +299,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   5d8efdaaecd08da028fa24461fffb3efed7c0a
 
 # 📁 .git\objects\24
+  66c7b56c308e97a2b20003aedb9182758d9517
   b79496d24a73b7aacaa101f2245e84ba314370
 
 # 📁 .git\objects\28
@@ -296,6 +310,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\2e
   38a5d12a4afb3a3278bce9800b15f6b5baf1f3
+  468913dc5c7c70c46892f6eec21f93cec7bc99
 
 # 📁 .git\objects\31
   2dfead943873566a15f3a21ab2dc025bdae6ae
@@ -308,9 +323,11 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\49
   1007bf22fdd919a1648aeb1e544c94ef29d4d4
+  68b5ced807432890440ada7b1410082dfd1303
 
 # 📁 .git\objects\4b
   1690cd58a45a4f9debf367b8a7faac074473d4
+  d6507fbb7158144693d1baf81da25ce906d97f
 
 # 📁 .git\objects\4c
   ffc0accc9d352c586d092a5a846473bce2468b
@@ -331,6 +348,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\5c
   79bc083132fc9b16a3a84aeb713d25fe2117a8
 
+# 📁 .git\objects\5d
+  decf8f5024355c7a98fc53f4a2d9ca6840916b
+
 # 📁 .git\objects\5e
   48175eaf38bd004500db4adbd556559d944488
   71adbf28597442e55e8d740f46b73b099d4ed7
@@ -340,6 +360,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\60
   2b81f560e239c72a3d486507d6ed226b418d0d
+  e5c91999162473a354cf4023952e3de4346f0a
 
 # 📁 .git\objects\65
   f4794109433dd2526c37bb905d9abcb4839be0
@@ -350,6 +371,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\6c
   6ec4373ae28e4252aab43ff82e9703650097e6
 
+# 📁 .git\objects\71
+  2f7965df46cb71616ba3494567c5d51f3a2874
+
 # 📁 .git\objects\72
   770e62dde854164707efeba0033f4b2620bf66
 
@@ -357,7 +381,11 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   341a2dde0b9b273ed7a46b18b0fa1d8595b2b3
 
 # 📁 .git\objects\74
+  135ea86b24d1fa951f15e82cefa0100a6260e1
   c8547238297b7705a9646ecde4951a5e834706
+
+# 📁 .git\objects\75
+  55c8c4063169ec7adeb719babca1bcdbf8f99a
 
 # 📁 .git\objects\76
   b8bf4aa29c3ce99ca37d7a214b42b39db735a0
@@ -370,6 +398,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\88
   7fe0782b511d979e0cec7b564b1f4216e8e4eb
+
+# 📁 .git\objects\8c
+  4eb042a32e40b914edd91c5d6d3420609a7e10
 
 # 📁 .git\objects\8d
   8f7dffa5b30c55d3d520c2073903e2d512cad7
@@ -392,8 +423,12 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\b2
   47b4b1f65f62f26cda428a6ac643d4a66bf0ff
 
+# 📁 .git\objects\b3
+  5d9cb90d978abbe9eb310cc7f35574fd07462a
+
 # 📁 .git\objects\b6
   b8241ee85857963fbdd89ae965f747ce152c9e
+  cd0a773027ed425431b736429344af59273f86
 
 # 📁 .git\objects\b7
   9e4b59a12b7f13446ded72770fe8d6a2a4046b
@@ -405,6 +440,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   6213e1dfe6b0a79ce7d8b37d0d2dc70f0250bb
 
 # 📁 .git\objects\be
+  7128ec21bba10062fa80646e3c7c6c4a676eb1
   b10716fff3fda206cdacb8de0c4b7e1a4dce27
 
 # 📁 .git\objects\c2
@@ -431,6 +467,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\d3
   96a4b95c2b54d2a53e0fbd317202678ceecadc
 
+# 📁 .git\objects\d5
+  633349db9cb2d14b04546c839d7c54c32bb14f
+
 # 📁 .git\objects\d7
   86bf40bf5729032b89c9c849128d0630490ab9
 
@@ -442,6 +481,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\df
   b7cb4fdf31f987308a6ba08aaefd0e3cf3fc59
+
+# 📁 .git\objects\e3
+  0d9b7d3982d84fc79f658d77fe5efd9bf5e104
 
 # 📁 .git\objects\e5
   96e41bf9a46055b41bfe2ae82f3927a0bfd2c3
@@ -461,6 +503,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\ee
   5cbded6b5d3f170466396bf25d55345cc06ff1
   e886ce59ad461244afc435c85f9387afc1a951
+
+# 📁 .git\objects\f5
+  5f0e92b0230689777b3fee79a1afb886b608fe
 
 # 📁 .git\objects\f7
   ad003c99914f5541a8ea72ccd2c3e7c9c296fb
@@ -840,6 +885,7 @@ def signup():
 
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+    conn = None
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
@@ -847,14 +893,16 @@ def signup():
         c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
                   (username, email, hashed_pw))
         conn.commit()
-        conn.close()
         return jsonify({"success": True}), 201
-    except sqlite3.IntegrityError as e:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "Username or email already exists."}), 409
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 # LOGIN
 @app.route("/login", methods=["POST"])
@@ -1176,6 +1224,8 @@ import Hero from "./components/Hero";
 import Faq from "./components/Faq";
 import Signup from "./components/Signup";
 import Login from "./components/Login";
+import Dashboard from "./components/Dashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
@@ -1186,6 +1236,14 @@ export default function App() {
         <Route path="/faq" element={<Faq />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </div>
   );
@@ -1205,11 +1263,15 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { BrowserRouter } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext.jsx'
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
@@ -1217,6 +1279,23 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 ------------------------------------------------------------
 
 # 📁 frontend\src\components
+
+## 📄 frontend/src/components/Dashboard.jsx
+import React, { useContext } from "react";
+import { AuthContext } from "../context/AuthContext.jsx";
+
+export default function Dashboard() {
+    const { user } = useContext(AuthContext);
+
+    return (
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+            <h1 className="text-3xl font-bold mb-4">Welcome, {user.email} 👋</h1>
+            <p className="text-gray-400">You’re logged in and seeing a protected page.</p>
+        </div>
+    );
+}
+
+------------------------------------------------------------
 
 ## 📄 frontend/src/components/Faq.jsx
 import React from "react";
@@ -1287,33 +1366,59 @@ export default function Hero() {
 ------------------------------------------------------------
 
 ## 📄 frontend/src/components/Login.jsx
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import axios from "axios";
+import { AuthContext } from "../context/AuthContext.jsx";
+import { useNavigate } from "react-router-dom";
 
 export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const { login } = useContext(AuthContext);
+    const navigate = useNavigate();
+
+    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess(false);
 
+        if (!email || !password) {
+            setError("All fields are required.");
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            setError("Invalid email format.");
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Password must be at least 6 characters.");
+            return;
+        }
+
+        setLoading(true);
+
         try {
-            const res = await axios.post("http://127.0.0.1:5000/login", {
-                email,
-                password
-            });
+            const res = await axios.post("http://127.0.0.1:5000/login", { email, password });
 
             if (res.data.success) {
+                login(email);
                 setSuccess(true);
                 setEmail("");
                 setPassword("");
+                navigate("/dashboard"); // ✅ Auto redirect
             }
         } catch (err) {
             setError(err.response?.data?.error || "Login failed.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -1326,11 +1431,7 @@ export default function Login() {
                 <h2 className="text-2xl font-bold text-center">Login</h2>
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
-                {success && (
-                    <div className="bg-green-600 p-2 rounded text-sm">
-                        Logged in successfully! ✅
-                    </div>
-                )}
+                {success && <div className="bg-green-600 p-2 rounded text-sm">Logged in successfully! ✅</div>}
 
                 <input
                     type="email"
@@ -1349,9 +1450,37 @@ export default function Login() {
 
                 <button
                     type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 p-2 rounded font-semibold"
+                    disabled={loading}
+                    className={`w-full bg-indigo-600 p-2 rounded font-semibold transition ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"}`}
                 >
-                    Login
+                    {loading ? (
+                        <div className="flex justify-center items-center h-6 space-x-1">
+                            {[...Array(5)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="w-1 bg-white rounded animate-pulse"
+                                    style={{
+                                        animationDelay: `${i * 0.15}s`,
+                                        animationDuration: "1s",
+                                        height: "100%",
+                                        transformOrigin: "center bottom",
+                                        animationName: "wavePulse"
+                                    }}
+                                />
+                            ))}
+                            <style>
+                                {`
+                                  @keyframes wavePulse {
+                                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
+                                    50% { transform: scaleY(1); opacity: 1; }
+                                  }
+                                  .animate-pulse {
+                                    animation: wavePulse 1s ease-in-out infinite;
+                                  }
+                                `}
+                            </style>
+                        </div>
+                    ) : "Login"}
                 </button>
             </form>
         </div>
@@ -1361,30 +1490,53 @@ export default function Login() {
 ------------------------------------------------------------
 
 ## 📄 frontend/src/components/Navbar.jsx
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
+import { AuthContext } from "../context/AuthContext.jsx";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Navbar() {
+  const { user, logout } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <>
       <header className="fixed top-0 left-0 w-full z-50 bg-transparent">
         <div className="max-w-6xl mx-auto px-4 py-4 grid grid-cols-3 items-center">
           {/* Logo (left) */}
-          <h1 className="text-white text-2xl font-bold">EchoMind</h1>
+          <Link to="/" className="text-white text-2xl font-bold">
+            EchoMind
+          </Link>
 
           {/* Nav links (centered) */}
           <nav className="hidden md:flex justify-center space-x-6 text-white">
-            <a href="/" className="hover:text-gray-300">Home</a>
-            <a href="/faq" className="hover:text-gray-300">FAQ</a>
+            <Link to="/" className="hover:text-gray-300">Home</Link>
+            <Link to="/faq" className="hover:text-gray-300">FAQ</Link>
+            {user && <Link to="/dashboard" className="hover:text-gray-300">Dashboard</Link>}
           </nav>
+
+          {/* Auth buttons (right) */}
+          <div className="hidden md:flex justify-end space-x-4">
+            {!user ? (
+              <>
+                <Link to="/login" className="text-white hover:text-gray-300">Login</Link>
+                <Link to="/signup" className="text-white hover:text-gray-300">Sign Up</Link>
+              </>
+            ) : (
+              <button onClick={handleLogout} className="text-white hover:text-red-400">
+                Logout
+              </button>
+            )}
+          </div>
 
           {/* Hamburger (right) */}
           <div className="flex justify-end md:hidden">
-            <button
-              className="focus:outline-none"
-              onClick={() => setOpen(true)}
-            >
+            <button className="focus:outline-none" onClick={() => setOpen(true)}>
               <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -1395,28 +1547,47 @@ export default function Navbar() {
 
       {/* Mobile overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setOpen(false)} />
       )}
 
       {/* Slide-out menu */}
-      <div className={`fixed top-0 right-0 h-full w-2/3 max-w-xs bg-gray-900 z-50 transform transition-transform duration-300 ease-in-out
-        ${open ? "translate-x-0" : "translate-x-full"}`}>
+      <div className={`fixed top-0 right-0 h-full w-2/3 max-w-xs bg-gray-900 z-50 transform transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "translate-x-full"}`}>
         <div className="p-6 flex flex-col space-y-4 text-white">
-          <button
-            className="self-end text-2xl font-bold focus:outline-none"
-            onClick={() => setOpen(false)}
-          >
-            ✕
-          </button>
-          <a href="#" className="text-lg hover:text-gray-300">Home</a>
-          <a href="#" className="text-lg hover:text-gray-300">About</a>
+          <button className="self-end text-2xl font-bold focus:outline-none" onClick={() => setOpen(false)}>✕</button>
+          <Link to="/" className="text-lg hover:text-gray-300" onClick={() => setOpen(false)}>Home</Link>
+          <Link to="/faq" className="text-lg hover:text-gray-300" onClick={() => setOpen(false)}>FAQ</Link>
+          {user && (
+            <Link to="/dashboard" className="text-lg hover:text-gray-300" onClick={() => setOpen(false)}>Dashboard</Link>
+          )}
+          {!user ? (
+            <>
+              <Link to="/login" className="text-lg hover:text-gray-300" onClick={() => setOpen(false)}>Login</Link>
+              <Link to="/signup" className="text-lg hover:text-gray-300" onClick={() => setOpen(false)}>Sign Up</Link>
+            </>
+          ) : (
+            <button onClick={() => { setOpen(false); handleLogout(); }} className="text-left text-lg hover:text-red-400">Logout</button>
+          )}
         </div>
       </div>
     </>
   );
+}
+
+------------------------------------------------------------
+
+## 📄 frontend/src/components/ProtectedRoute.jsx
+import React, { useContext } from "react";
+import { Navigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext.jsx";
+
+export default function ProtectedRoute({ children }) {
+    const { user } = useContext(AuthContext);
+
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return children;
 }
 
 ------------------------------------------------------------
@@ -1431,11 +1602,31 @@ export default function Signup() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess(false);
+
+        if (!email || !username || !password) {
+            setError("All fields are required.");
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            setError("Invalid email format.");
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Password must be at least 6 characters.");
+            return;
+        }
+
+        setLoading(true);
 
         try {
             const res = await axios.post("http://127.0.0.1:5000/signup", {
@@ -1452,6 +1643,8 @@ export default function Signup() {
             }
         } catch (err) {
             setError(err.response?.data?.error || "Signup failed.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -1464,11 +1657,7 @@ export default function Signup() {
                 <h2 className="text-2xl font-bold text-center">Sign Up</h2>
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
-                {success && (
-                    <div className="bg-green-600 p-2 rounded text-sm">
-                        Signup successful! 🎉
-                    </div>
-                )}
+                {success && <div className="bg-green-600 p-2 rounded text-sm">Signup successful! 🎉</div>}
 
                 <input
                     type="text"
@@ -1494,9 +1683,37 @@ export default function Signup() {
 
                 <button
                     type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 p-2 rounded font-semibold"
+                    disabled={loading}
+                    className={`w-full bg-indigo-600 p-2 rounded font-semibold transition ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"}`}
                 >
-                    Sign Up
+                    {loading ? (
+                        <div className="flex justify-center items-center h-6 space-x-1">
+                            {[...Array(5)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="w-1 bg-white rounded animate-pulse"
+                                    style={{
+                                        animationDelay: `${i * 0.15}s`,
+                                        animationDuration: "1s",
+                                        height: "100%",
+                                        transformOrigin: "center bottom",
+                                        animationName: "wavePulse"
+                                    }}
+                                />
+                            ))}
+                            <style>
+                                {`
+                                  @keyframes wavePulse {
+                                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
+                                    50% { transform: scaleY(1); opacity: 1; }
+                                  }
+                                  .animate-pulse {
+                                    animation: wavePulse 1s ease-in-out infinite;
+                                  }
+                                `}
+                            </style>
+                        </div>
+                    ) : "Sign Up"}
                 </button>
             </form>
         </div>
@@ -1815,10 +2032,43 @@ export default function UploadForm() {
 
 ------------------------------------------------------------
 
-# 📁 logs
-  app.log
+# 📁 frontend\src\context
 
-# 📁 temp
+## 📄 frontend/src/context/AuthContext.jsx
+import React from "react";
+import { createContext, useState, useEffect } from "react";
+
+export const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+    const [user, setUser] = useState(() => {
+        try {
+            const stored = localStorage.getItem("user");
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
+
+    const login = (email) => {
+        const newUser = { email };
+        setUser(newUser);
+        localStorage.setItem("user", JSON.stringify(newUser));
+    };
+
+    const logout = () => {
+        setUser(null);
+        localStorage.removeItem("user");
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, login, logout }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+------------------------------------------------------------
 
 # 📁 tests
   empty.mp3

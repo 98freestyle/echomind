@@ -7,11 +7,31 @@ export default function Signup() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess(false);
+
+        if (!email || !username || !password) {
+            setError("All fields are required.");
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            setError("Invalid email format.");
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Password must be at least 6 characters.");
+            return;
+        }
+
+        setLoading(true);
 
         try {
             const res = await axios.post("http://127.0.0.1:5000/signup", {
@@ -28,6 +48,8 @@ export default function Signup() {
             }
         } catch (err) {
             setError(err.response?.data?.error || "Signup failed.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -40,11 +62,7 @@ export default function Signup() {
                 <h2 className="text-2xl font-bold text-center">Sign Up</h2>
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
-                {success && (
-                    <div className="bg-green-600 p-2 rounded text-sm">
-                        Signup successful! 🎉
-                    </div>
-                )}
+                {success && <div className="bg-green-600 p-2 rounded text-sm">Signup successful! 🎉</div>}
 
                 <input
                     type="text"
@@ -70,9 +88,37 @@ export default function Signup() {
 
                 <button
                     type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 p-2 rounded font-semibold"
+                    disabled={loading}
+                    className={`w-full bg-indigo-600 p-2 rounded font-semibold transition ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"}`}
                 >
-                    Sign Up
+                    {loading ? (
+                        <div className="flex justify-center items-center h-6 space-x-1">
+                            {[...Array(5)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="w-1 bg-white rounded animate-pulse"
+                                    style={{
+                                        animationDelay: `${i * 0.15}s`,
+                                        animationDuration: "1s",
+                                        height: "100%",
+                                        transformOrigin: "center bottom",
+                                        animationName: "wavePulse"
+                                    }}
+                                />
+                            ))}
+                            <style>
+                                {`
+                                  @keyframes wavePulse {
+                                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
+                                    50% { transform: scaleY(1); opacity: 1; }
+                                  }
+                                  .animate-pulse {
+                                    animation: wavePulse 1s ease-in-out infinite;
+                                  }
+                                `}
+                            </style>
+                        </div>
+                    ) : "Sign Up"}
                 </button>
             </form>
         </div>

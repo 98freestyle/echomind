@@ -351,6 +351,7 @@ def signup():
 
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+    conn = None
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
@@ -358,14 +359,16 @@ def signup():
         c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
                   (username, email, hashed_pw))
         conn.commit()
-        conn.close()
         return jsonify({"success": True}), 201
-    except sqlite3.IntegrityError as e:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "Username or email already exists."}), 409
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 # LOGIN
 @app.route("/login", methods=["POST"])
