@@ -415,5 +415,15 @@ def handle_exception(e):
 
 startup_cleanup()
 
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    from flask import send_from_directory
+    if path != "" and os.path.exists(f"../frontend/dist/{path}"):
+        return send_from_directory("../frontend/dist", path)
+    else:
+        return send_from_directory("../frontend/dist", "index.html")
+
+
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
