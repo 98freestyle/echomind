@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from collections import defaultdict, deque
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -50,6 +51,29 @@ UPLOAD_HISTORY = defaultdict(lambda: deque())
 active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
+
+def get_guest_weekly_usage(ip):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE ip = ? AND user_id IS NULL AND date >= ?
+        """, (ip, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch guest usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
 
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
@@ -97,6 +121,7 @@ def cleanup_old_temp():
         logger.error(f"Cleanup error: {e}")
 
 def process_job(job_id, upload_path, filename, selected_stems):
+    start_time = time.time()
     try:
         log(job_id, "Starting Demucs split...")
 
@@ -115,10 +140,8 @@ def process_job(job_id, upload_path, filename, selected_stems):
             logger=logger
         )
 
-        # 🔥 Delete unselected .wav files from track_dir
         all_possible_stems = {"vocals", "drums", "bass", "other", "no_vocals"}
         for stem in all_possible_stems:
-            # 🧠 special case: if 2-stems mode, treat "other" as "no_vocals"
             if stem == "no_vocals":
                 if "other" in selected_stems:
                     continue
@@ -127,7 +150,6 @@ def process_job(job_id, upload_path, filename, selected_stems):
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
-        # 🎧 Create previews for selected stems only
         for stem in selected_stems:
             src = os.path.join(track_dir, f"{stem}.wav")
             if stem == "other" and not os.path.exists(src):
@@ -155,6 +177,8 @@ def process_job(job_id, upload_path, filename, selected_stems):
             JOBS[job_id]["status"] = "done"
             JOBS[job_id]["zip"] = zip_output_path
 
+        duration = time.time() - start_time
+        log(job_id, f"Processing time: {duration:.2f} seconds")
         log(job_id, "Job complete. ZIP ready.")
         JOBS[job_id]["events"].put("Job complete")
 
@@ -214,7 +238,7 @@ def is_rate_limited(ip):
 @cross_origin()
 def upload():
     cleanup_old_temp()
-    ip = request.remote_addr # ip = request.headers.get("X-Forwarded-For", request.remote_addr) / change to once deployed
+    ip = request.remote_addr
     rate_limit_msg = is_rate_limited(ip)
     if rate_limit_msg:
         return jsonify({"error": rate_limit_msg}), 429
@@ -227,10 +251,19 @@ def upload():
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Unsupported file type."}), 400
 
+    # 👇 Calculate file size
     file.seek(0, os.SEEK_END)
-    if file.tell() == 0:
-        return jsonify({"error": "Empty or corrupted file."}), 400
+    file_size_mb = round(file.tell() / (1024 * 1024), 2)
     file.seek(0)
+
+    # 👇 Guest limit check
+    is_guest = True  # We'll update this later when account auth is added
+    if is_guest:
+        weekly_usage = get_guest_weekly_usage(ip)
+        if weekly_usage + file_size_mb > 150:
+            return jsonify({
+                "error": f"Weekly limit exceeded (150MB max). You’ve used {round(weekly_usage, 2)}MB."
+            }), 403
 
     selected_stems = request.form.getlist("stems") or ["vocals", "other"]
     job_id = str(uuid.uuid4())
@@ -264,11 +297,31 @@ def upload():
         upload_path = wav_path
         log(job_id, "Extracted audio from MP4.")
 
+    # 👇 Log usage to DB
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        upload_date = time.strftime("%Y-%m-%d")
+        user_id = None  # Placeholder for future auth
+
+        c.execute(
+            "INSERT INTO usage (user_id, ip, date, mb_used) VALUES (?, ?, ?, ?)",
+            (user_id, ip, upload_date, file_size_mb)
+        )
+        conn.commit()
+    except Exception as e:
+        print("Failed to log usage:", e)
+    finally:
+        if conn:
+            conn.close()
+
     with jobs_lock:
         JOBS[job_id] = {"status": "processing", "zip": None, "events": queue.Queue(), "ip": ip}
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 @app.route("/stream/<job_id>")
 @cross_origin()
@@ -402,6 +455,45 @@ def login():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    
+@app.route("/usage", methods=["GET"])
+@cross_origin()
+def usage():
+    ip = request.remote_addr
+    is_guest = True  # We'll replace this with real auth later
+
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        from datetime import datetime, timedelta
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        if is_guest:
+            # Sum guest usage by IP
+            c.execute("""
+                SELECT SUM(mb_used) FROM usage
+                WHERE ip = ? AND user_id IS NULL AND date >= ?
+            """, (ip, start_of_week_str))
+            used = c.fetchone()[0] or 0
+            limit = 150
+        else:
+            # Placeholder for future logic (accounts, premium)
+            used = 0
+            limit = 500
+
+        return jsonify({
+            "used_mb": round(used, 2),
+            "limit_mb": limit
+        })
+
+    except Exception as e:
+        return jsonify({"error": "Failed to fetch usage"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.errorhandler(RequestEntityTooLarge)

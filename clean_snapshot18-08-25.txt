@@ -295,6 +295,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   972d3009cb426e0b20a8e79535685b9d17aaf4
   e16b0713ca09f2e92986785ee91a5dfaea8e93
 
+# 📁 .git\objects\21
+  2e6c76d8f2856bc005a6b0d7f0fd0c27a7796d
+
 # 📁 .git\objects\22
   5d8efdaaecd08da028fa24461fffb3efed7c0a
 
@@ -311,12 +314,22 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\2e
   38a5d12a4afb3a3278bce9800b15f6b5baf1f3
   468913dc5c7c70c46892f6eec21f93cec7bc99
+  be638aca7f1e3523cc15c6d10c4f55160e92e2
 
 # 📁 .git\objects\31
   2dfead943873566a15f3a21ab2dc025bdae6ae
 
 # 📁 .git\objects\33
   ad091d26d8a9dc95ebdf616e217d985ec215b8
+
+# 📁 .git\objects\39
+  a4a4c932e81db552fdb2f11b7a29000673053b
+
+# 📁 .git\objects\3a
+  4d284e9b0a79b32dd7d27c96c6713d447c1f54
+
+# 📁 .git\objects\3f
+  60d23ca1cd5304aaede978b7665cc604998f59
 
 # 📁 .git\objects\46
   119b5f64d3313837c3a7effce0bdf925d486bd
@@ -337,6 +350,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\51
   4a6b64e2daca5a9532010e28eb0836ca7590a5
+
+# 📁 .git\objects\53
+  688fed9798510da9a199c2fbc963c467593237
 
 # 📁 .git\objects\54
   3adedc82e5fb30355e9f6a26f49b2260eb6696
@@ -365,6 +381,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\65
   f4794109433dd2526c37bb905d9abcb4839be0
 
+# 📁 .git\objects\68
+  97ece341d11db400c0dd6165838402610befa9
+
 # 📁 .git\objects\6b
   af00a22f435274cc535f43392ab8ae12b8b1a2
 
@@ -382,6 +401,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\74
   135ea86b24d1fa951f15e82cefa0100a6260e1
+  c67c35ebdb0f33eb562515b671cba293856586
   c8547238297b7705a9646ecde4951a5e834706
 
 # 📁 .git\objects\75
@@ -389,6 +409,10 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\76
   b8bf4aa29c3ce99ca37d7a214b42b39db735a0
+
+# 📁 .git\objects\77
+  0a8bf44633280117389fe4add29e0fa972d86c
+  4bcf9babe4baa2b454c596525f6052c0131717
 
 # 📁 .git\objects\82
   397b32f876864244bb8618e952f9e3642e5aad
@@ -407,6 +431,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\90
   6c2f52d2592c0e1513f10c8b621768ee97f328
+
+# 📁 .git\objects\96
+  41d3f498da52659d74b0f1a4369ff4392ea535
 
 # 📁 .git\objects\9c
   ba089177d520973c13d0f538a9808cb56d67e9
@@ -434,6 +461,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   9e4b59a12b7f13446ded72770fe8d6a2a4046b
 
 # 📁 .git\objects\bc
+  06e60a673a51bd886c79ada3092264a34e58be
   6456fc62630dc39fdaaf67141a2aa1b3b99605
 
 # 📁 .git\objects\bd
@@ -464,11 +492,17 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\d0
   c46e4019c75ada27fe69d8337e92084faf5599
 
+# 📁 .git\objects\d2
+  498eefdb90f0a0e085a0199f234d8f31b3ff17
+
 # 📁 .git\objects\d3
   96a4b95c2b54d2a53e0fbd317202678ceecadc
 
 # 📁 .git\objects\d5
   633349db9cb2d14b04546c839d7c54c32bb14f
+
+# 📁 .git\objects\d6
+  85d73fc1d7f1c654a2135b7849a09825c6a6e0
 
 # 📁 .git\objects\d7
   86bf40bf5729032b89c9c849128d0630490ab9
@@ -495,6 +529,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   4bfb1a3e3252b3a922d9358cbe0bf872931c7b
 
 # 📁 .git\objects\eb
+  44ff5f76878efeca985ba0291480d5aa0a062d
   cd6ff325e804eda13f99346bfd62d319516b56
 
 # 📁 .git\objects\ed
@@ -512,6 +547,12 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\f8
   4a765bb9ac7dda68e17f50b36ec47e12d6da30
+
+# 📁 .git\objects\fa
+  7ede26f0cc2eca7298bfe22ca8df1e2deacbce
+
+# 📁 .git\objects\fd
+  0d99623aff0df7190d9b2dbcdbbd343bf68b54
 
 # 📁 .git\objects\info
 
@@ -631,6 +672,7 @@ def cleanup_old_temp():
         logger.error(f"Cleanup error: {e}")
 
 def process_job(job_id, upload_path, filename, selected_stems):
+    start_time = time.time()
     try:
         log(job_id, "Starting Demucs split...")
 
@@ -649,10 +691,8 @@ def process_job(job_id, upload_path, filename, selected_stems):
             logger=logger
         )
 
-        # 🔥 Delete unselected .wav files from track_dir
         all_possible_stems = {"vocals", "drums", "bass", "other", "no_vocals"}
         for stem in all_possible_stems:
-            # 🧠 special case: if 2-stems mode, treat "other" as "no_vocals"
             if stem == "no_vocals":
                 if "other" in selected_stems:
                     continue
@@ -661,7 +701,6 @@ def process_job(job_id, upload_path, filename, selected_stems):
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
-        # 🎧 Create previews for selected stems only
         for stem in selected_stems:
             src = os.path.join(track_dir, f"{stem}.wav")
             if stem == "other" and not os.path.exists(src):
@@ -689,6 +728,8 @@ def process_job(job_id, upload_path, filename, selected_stems):
             JOBS[job_id]["status"] = "done"
             JOBS[job_id]["zip"] = zip_output_path
 
+        duration = time.time() - start_time
+        log(job_id, f"Processing time: {duration:.2f} seconds")
         log(job_id, "Job complete. ZIP ready.")
         JOBS[job_id]["events"].put("Job complete")
 
@@ -949,6 +990,16 @@ def handle_exception(e):
 
 startup_cleanup()
 
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    from flask import send_from_directory
+    if path != "" and os.path.exists(f"../frontend/dist/{path}"):
+        return send_from_directory("../frontend/dist", path)
+    else:
+        return send_from_directory("../frontend/dist", "index.html")
+
+
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
 
@@ -1136,6 +1187,15 @@ export default {
   plugins: [],
 }
 ------------------------------------------------------------
+
+# 📁 frontend\dist
+  favicon.ico
+  index.html
+  logo.png
+
+# 📁 frontend\dist\assets
+  index-BNYcDV_n.css
+  index-rNQzAJe4.js
 
 # 📁 frontend\public
   favicon.ico
@@ -2072,9 +2132,11 @@ export function AuthProvider({ children }) {
 
 # 📁 tests
   empty.mp3
+  ks.mp3
   long.mp3
   output.flac
   output.wav
+  SØLACE - I'm God [Edit] [Mickey Nox MASTER 44.1 16B].wav
   test.mp3
   test.mp4
   test_backend.py

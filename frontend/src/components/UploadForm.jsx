@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { uploadFile, streamJob, downloadZip } from "../api";
+import axios from "axios";
 
 export default function UploadForm() {
   const [file, setFile] = useState(null);
@@ -17,10 +17,27 @@ export default function UploadForm() {
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
 
+  // ✅ Usage state
+  const [usedMB, setUsedMB] = useState(0);
+  const [limitMB, setLimitMB] = useState(150);
+
+  const fetchUsage = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:5000/usage");
+      setUsedMB(res.data.used_mb);
+      setLimitMB(res.data.limit_mb);
+    } catch (err) {
+      console.error("Failed to fetch usage", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsage();
+  }, []);
 
   const toggleStem = (stem) => {
-    setStems(prev =>
-      prev.includes(stem) ? prev.filter(s => s !== stem) : [...prev, stem]
+    setStems((prev) =>
+      prev.includes(stem) ? prev.filter((s) => s !== stem) : [...prev, stem]
     );
   };
 
@@ -53,13 +70,13 @@ export default function UploadForm() {
         setTimeout(() => {
           setDone(true);
           setUploading(false);
+          fetchUsage(); // ✅ update usage after job finishes
         }, 500);
       }
     });
 
     setEvtSource(es);
   };
-
 
   const handleDownload = () => {
     if (jobId) {
@@ -94,7 +111,7 @@ export default function UploadForm() {
   useEffect(() => {
     return () => {
       if (evtSource) evtSource.close();
-      Object.values(waveRefs.current).forEach(ws => ws.destroy());
+      Object.values(waveRefs.current).forEach((ws) => ws.destroy());
     };
   }, [evtSource]);
 
@@ -122,7 +139,7 @@ export default function UploadForm() {
 
   useEffect(() => {
     if (done && showPreview && jobId) {
-      stems.forEach(stem => {
+      stems.forEach((stem) => {
         const url = `http://127.0.0.1:5000/preview/${jobId}/${stem}`;
         createWaveform(url, stem);
       });
@@ -134,16 +151,16 @@ export default function UploadForm() {
     if (!ws) return;
     if (playingStates[stem]) {
       ws.pause();
-      setPlayingStates(prev => ({ ...prev, [stem]: false }));
+      setPlayingStates((prev) => ({ ...prev, [stem]: false }));
     } else {
       ws.play();
-      setPlayingStates(prev => ({ ...prev, [stem]: true }));
+      setPlayingStates((prev) => ({ ...prev, [stem]: true }));
     }
   };
 
   const handleVolumeChange = (stem, value) => {
     const vol = Math.max(0, Math.min(1, value));
-    setVolumes(prev => ({ ...prev, [stem]: vol }));
+    setVolumes((prev) => ({ ...prev, [stem]: vol }));
     if (waveRefs.current[stem]) {
       waveRefs.current[stem].setVolume(vol);
     }
@@ -172,18 +189,41 @@ export default function UploadForm() {
     window.addEventListener("mouseup", upHandler);
   };
 
+  const usagePercent = Math.min(100, Math.round((usedMB / limitMB) * 100));
+
   return (
     <div
       className="bg-gray-800 bg-opacity-50 p-6 rounded-xl shadow-lg"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      {/* ✅ USAGE BAR */}
+      <div className="mb-4">
+        <p className="text-sm text-gray-200 mb-1">
+          📊 Usage: {usedMB}MB / {limitMB}MB ({usagePercent}%)
+        </p>
+        <div className="w-full h-3 bg-gray-600 rounded">
+          <div
+            className={`h-3 rounded transition-all duration-300 ${
+              usagePercent < 60
+                ? "bg-green-500"
+                : usagePercent < 90
+                ? "bg-yellow-400"
+                : "bg-red-500"
+            }`}
+            style={{ width: `${usagePercent}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* ERROR */}
       {error && (
         <div className="mb-4 p-3 bg-red-600 bg-opacity-80 rounded text-white text-sm">
           {error}
         </div>
       )}
 
+      {/* UPLOAD + STEMS */}
       {!done && !uploading && (
         <>
           <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-lg cursor-pointer hover:border-indigo-400 transition">
@@ -198,7 +238,7 @@ export default function UploadForm() {
           </label>
 
           <div className="flex flex-wrap gap-4 justify-center mt-4">
-            {["vocals", "drums", "bass", "other"].map(stem => (
+            {["vocals", "drums", "bass", "other"].map((stem) => (
               <label key={stem} className="text-sm">
                 <input
                   type="checkbox"
@@ -214,6 +254,7 @@ export default function UploadForm() {
         </>
       )}
 
+      {/* LOADING */}
       {uploading && !done && (
         <div className="flex flex-col items-center justify-center mt-8">
           <div className="flex space-x-1 h-8">
@@ -226,7 +267,7 @@ export default function UploadForm() {
                   animationDuration: "1s",
                   height: "100%",
                   transformOrigin: "center bottom",
-                  animationName: "wavePulse"
+                  animationName: "wavePulse",
                 }}
               />
             ))}
@@ -247,19 +288,25 @@ export default function UploadForm() {
         </div>
       )}
 
+      {/* DOWNLOAD + PREVIEW */}
       {done && (
         <div className="mt-6">
           <button
             onClick={handleDownload}
-            className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium">
+            className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium"
+          >
             Download Stems
           </button>
 
           {showPreview && (
             <div className="mt-6 bg-gray-900 p-4 rounded-lg">
               <h3 className="text-white mb-2">Preview Stems</h3>
-              {stems.map(stem => (
+              {stems.map((stem) => (
                 <div key={stem} className="mb-6 flex items-center space-x-3">
+                  <div className="min-w-[60px] text-sm text-white font-medium capitalize">
+                    {stem}
+                  </div>
+
                   <button
                     onClick={() => toggleStemPlay(stem)}
                     className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full flex items-center justify-center"
@@ -278,7 +325,10 @@ export default function UploadForm() {
                     </svg>
                   </button>
 
-                  <div id={`waveform-${stem}`} className="flex-1 bg-black rounded"></div>
+                  <div
+                    id={`waveform-${stem}`}
+                    className="flex-1 bg-black rounded"
+                  ></div>
 
                   <div
                     className="relative w-8 h-32 bg-gray-700 rounded-lg cursor-pointer flex flex-col justify-end items-center overflow-hidden"
