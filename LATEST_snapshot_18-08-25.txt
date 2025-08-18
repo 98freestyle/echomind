@@ -21,6 +21,7 @@ JOB_EXPIRATION=300
 ## 📄 clean_snapshot.txt
 
 ------------------------------------------------------------
+  clean_snapshot18-08-25.txt
 
 ## 📄 INSTRUCTIONS.md
 
@@ -230,8 +231,10 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   COMMIT_EDITMSG
   config
   description
+  FETCH_HEAD
   HEAD
   index
+  ORIG_HEAD
 
 # 📁 .git\hooks
   applypatch-msg.sample
@@ -269,9 +272,11 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\00
   93deab8267a57425408ff4a78c86035142c3ef
+  a3dc8df758063edc6df245e84c148371f9b604
 
 # 📁 .git\objects\03
   391a5fc723bcabb13292cc7fdd296519621688
+  4a921081f88118264aa618b6b3cecaa1fc24c7
   fb12dc0fe5fa8dd98f5a9a0b55e1f1eff7aa0d
 
 # 📁 .git\objects\04
@@ -301,6 +306,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\22
   5d8efdaaecd08da028fa24461fffb3efed7c0a
 
+# 📁 .git\objects\23
+  48c9d835642c475ff80df23b6704e21e9a0ed2
+
 # 📁 .git\objects\24
   66c7b56c308e97a2b20003aedb9182758d9517
   b79496d24a73b7aacaa101f2245e84ba314370
@@ -328,10 +336,14 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\3a
   4d284e9b0a79b32dd7d27c96c6713d447c1f54
 
+# 📁 .git\objects\3e
+  fb6177302d67419625db17930572d2fe93f979
+
 # 📁 .git\objects\3f
   60d23ca1cd5304aaede978b7665cc604998f59
 
 # 📁 .git\objects\46
+  0cb1ee167d65f118333477e0d380f8eeed5da8
   119b5f64d3313837c3a7effce0bdf925d486bd
 
 # 📁 .git\objects\49
@@ -361,6 +373,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\59
   799b03487db9800ebae7b5236aa86ee5a2effa
 
+# 📁 .git\objects\5a
+  49f4eb43bbf6b71fe4e1eb1ea7d43baa7ca1b1
+
 # 📁 .git\objects\5c
   79bc083132fc9b16a3a84aeb713d25fe2117a8
 
@@ -372,6 +387,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   71adbf28597442e55e8d740f46b73b099d4ed7
 
 # 📁 .git\objects\5f
+  9c8eb57ff1429650cbc783128aae585669e81d
   b75858c26d3feca05c2ceea4be425e3f342c1b
 
 # 📁 .git\objects\60
@@ -389,6 +405,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\6c
   6ec4373ae28e4252aab43ff82e9703650097e6
+
+# 📁 .git\objects\70
+  b6482fcac1dcdec8084f47757e376736038b34
 
 # 📁 .git\objects\71
   2f7965df46cb71616ba3494567c5d51f3a2874
@@ -412,7 +431,11 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\77
   0a8bf44633280117389fe4add29e0fa972d86c
+  37928244001a2cd13d75c341485d347cab472c
   4bcf9babe4baa2b454c596525f6052c0131717
+
+# 📁 .git\objects\7a
+  26780e5f75d434491a450f924138eb60826362
 
 # 📁 .git\objects\82
   397b32f876864244bb8618e952f9e3642e5aad
@@ -487,6 +510,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   a1279e35c9255806161f05568df09404f1ebfc
 
 # 📁 .git\objects\ce
+  b457884706ec038c08f2aec5af9497d08299bb
   b870278ffd9bc0a4dd695a7afae0f536594cca
 
 # 📁 .git\objects\d0
@@ -524,6 +548,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\e6
   9de29bb2d1d6434b8b29ae775ad8c2e48c5391
+
+# 📁 .git\objects\e7
+  9d39058b1598815e85f35a9345649e434fefab
 
 # 📁 .git\objects\e8
   4bfb1a3e3252b3a922d9358cbe0bf872931c7b
@@ -588,6 +615,7 @@ from dotenv import load_dotenv
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from collections import defaultdict, deque
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -625,6 +653,29 @@ UPLOAD_HISTORY = defaultdict(lambda: deque())
 active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
+
+def get_guest_weekly_usage(ip):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE ip = ? AND user_id IS NULL AND date >= ?
+        """, (ip, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch guest usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
 
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
@@ -789,7 +840,7 @@ def is_rate_limited(ip):
 @cross_origin()
 def upload():
     cleanup_old_temp()
-    ip = request.remote_addr # ip = request.headers.get("X-Forwarded-For", request.remote_addr) / change to once deployed
+    ip = request.remote_addr
     rate_limit_msg = is_rate_limited(ip)
     if rate_limit_msg:
         return jsonify({"error": rate_limit_msg}), 429
@@ -802,10 +853,19 @@ def upload():
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Unsupported file type."}), 400
 
+    # 👇 Calculate file size
     file.seek(0, os.SEEK_END)
-    if file.tell() == 0:
-        return jsonify({"error": "Empty or corrupted file."}), 400
+    file_size_mb = round(file.tell() / (1024 * 1024), 2)
     file.seek(0)
+
+    # 👇 Guest limit check
+    is_guest = True  # We'll update this later when account auth is added
+    if is_guest:
+        weekly_usage = get_guest_weekly_usage(ip)
+        if weekly_usage + file_size_mb > 150:
+            return jsonify({
+                "error": f"Weekly limit exceeded (150MB max). You’ve used {round(weekly_usage, 2)}MB."
+            }), 403
 
     selected_stems = request.form.getlist("stems") or ["vocals", "other"]
     job_id = str(uuid.uuid4())
@@ -839,11 +899,31 @@ def upload():
         upload_path = wav_path
         log(job_id, "Extracted audio from MP4.")
 
+    # 👇 Log usage to DB
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        upload_date = time.strftime("%Y-%m-%d")
+        user_id = None  # Placeholder for future auth
+
+        c.execute(
+            "INSERT INTO usage (user_id, ip, date, mb_used) VALUES (?, ?, ?, ?)",
+            (user_id, ip, upload_date, file_size_mb)
+        )
+        conn.commit()
+    except Exception as e:
+        print("Failed to log usage:", e)
+    finally:
+        if conn:
+            conn.close()
+
     with jobs_lock:
         JOBS[job_id] = {"status": "processing", "zip": None, "events": queue.Queue(), "ip": ip}
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 @app.route("/stream/<job_id>")
 @cross_origin()
@@ -977,6 +1057,45 @@ def login():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    
+@app.route("/usage", methods=["GET"])
+@cross_origin()
+def usage():
+    ip = request.remote_addr
+    is_guest = True  # We'll replace this with real auth later
+
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        from datetime import datetime, timedelta
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        if is_guest:
+            # Sum guest usage by IP
+            c.execute("""
+                SELECT SUM(mb_used) FROM usage
+                WHERE ip = ? AND user_id IS NULL AND date >= ?
+            """, (ip, start_of_week_str))
+            used = c.fetchone()[0] or 0
+            limit = 150
+        else:
+            # Placeholder for future logic (accounts, premium)
+            used = 0
+            limit = 500
+
+        return jsonify({
+            "used_mb": round(used, 2),
+            "limit_mb": limit
+        })
+
+    except Exception as e:
+        return jsonify({"error": "Failed to fetch usage"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -1097,12 +1216,24 @@ db_path = os.path.join(BASE_DIR, "users.db")
 conn = sqlite3.connect(db_path)
 c = conn.cursor()
 
+# Users table
 c.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL
+    )
+''')
+
+# Usage table
+c.execute('''
+    CREATE TABLE IF NOT EXISTS usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        ip TEXT,
+        date TEXT,
+        mb_used INTEGER
     )
 ''')
 
@@ -1194,8 +1325,8 @@ export default {
   logo.png
 
 # 📁 frontend\dist\assets
-  index-BNYcDV_n.css
-  index-rNQzAJe4.js
+  index-DcRjaYIz.css
+  index-DQ5sLb87.js
 
 # 📁 frontend\public
   favicon.ico
@@ -1783,10 +1914,10 @@ export default function Signup() {
 ------------------------------------------------------------
 
 ## 📄 frontend/src/components/UploadForm.jsx
-
 import React, { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { uploadFile, streamJob, downloadZip } from "../api";
+import axios from "axios";
 
 export default function UploadForm() {
   const [file, setFile] = useState(null);
@@ -1802,10 +1933,27 @@ export default function UploadForm() {
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
 
+  // ✅ Usage state
+  const [usedMB, setUsedMB] = useState(0);
+  const [limitMB, setLimitMB] = useState(150);
+
+  const fetchUsage = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:5000/usage");
+      setUsedMB(res.data.used_mb);
+      setLimitMB(res.data.limit_mb);
+    } catch (err) {
+      console.error("Failed to fetch usage", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsage();
+  }, []);
 
   const toggleStem = (stem) => {
-    setStems(prev =>
-      prev.includes(stem) ? prev.filter(s => s !== stem) : [...prev, stem]
+    setStems((prev) =>
+      prev.includes(stem) ? prev.filter((s) => s !== stem) : [...prev, stem]
     );
   };
 
@@ -1838,13 +1986,13 @@ export default function UploadForm() {
         setTimeout(() => {
           setDone(true);
           setUploading(false);
+          fetchUsage(); // ✅ update usage after job finishes
         }, 500);
       }
     });
 
     setEvtSource(es);
   };
-
 
   const handleDownload = () => {
     if (jobId) {
@@ -1879,7 +2027,7 @@ export default function UploadForm() {
   useEffect(() => {
     return () => {
       if (evtSource) evtSource.close();
-      Object.values(waveRefs.current).forEach(ws => ws.destroy());
+      Object.values(waveRefs.current).forEach((ws) => ws.destroy());
     };
   }, [evtSource]);
 
@@ -1907,7 +2055,7 @@ export default function UploadForm() {
 
   useEffect(() => {
     if (done && showPreview && jobId) {
-      stems.forEach(stem => {
+      stems.forEach((stem) => {
         const url = `http://127.0.0.1:5000/preview/${jobId}/${stem}`;
         createWaveform(url, stem);
       });
@@ -1919,16 +2067,16 @@ export default function UploadForm() {
     if (!ws) return;
     if (playingStates[stem]) {
       ws.pause();
-      setPlayingStates(prev => ({ ...prev, [stem]: false }));
+      setPlayingStates((prev) => ({ ...prev, [stem]: false }));
     } else {
       ws.play();
-      setPlayingStates(prev => ({ ...prev, [stem]: true }));
+      setPlayingStates((prev) => ({ ...prev, [stem]: true }));
     }
   };
 
   const handleVolumeChange = (stem, value) => {
     const vol = Math.max(0, Math.min(1, value));
-    setVolumes(prev => ({ ...prev, [stem]: vol }));
+    setVolumes((prev) => ({ ...prev, [stem]: vol }));
     if (waveRefs.current[stem]) {
       waveRefs.current[stem].setVolume(vol);
     }
@@ -1957,18 +2105,41 @@ export default function UploadForm() {
     window.addEventListener("mouseup", upHandler);
   };
 
+  const usagePercent = Math.min(100, Math.round((usedMB / limitMB) * 100));
+
   return (
     <div
       className="bg-gray-800 bg-opacity-50 p-6 rounded-xl shadow-lg"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      {/* ✅ USAGE BAR */}
+      <div className="mb-4">
+        <p className="text-sm text-gray-200 mb-1">
+          📊 Usage: {usedMB}MB / {limitMB}MB ({usagePercent}%)
+        </p>
+        <div className="w-full h-3 bg-gray-600 rounded">
+          <div
+            className={`h-3 rounded transition-all duration-300 ${
+              usagePercent < 60
+                ? "bg-green-500"
+                : usagePercent < 90
+                ? "bg-yellow-400"
+                : "bg-red-500"
+            }`}
+            style={{ width: `${usagePercent}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* ERROR */}
       {error && (
         <div className="mb-4 p-3 bg-red-600 bg-opacity-80 rounded text-white text-sm">
           {error}
         </div>
       )}
 
+      {/* UPLOAD + STEMS */}
       {!done && !uploading && (
         <>
           <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-lg cursor-pointer hover:border-indigo-400 transition">
@@ -1983,7 +2154,7 @@ export default function UploadForm() {
           </label>
 
           <div className="flex flex-wrap gap-4 justify-center mt-4">
-            {["vocals", "drums", "bass", "other"].map(stem => (
+            {["vocals", "drums", "bass", "other"].map((stem) => (
               <label key={stem} className="text-sm">
                 <input
                   type="checkbox"
@@ -1999,6 +2170,7 @@ export default function UploadForm() {
         </>
       )}
 
+      {/* LOADING */}
       {uploading && !done && (
         <div className="flex flex-col items-center justify-center mt-8">
           <div className="flex space-x-1 h-8">
@@ -2011,7 +2183,7 @@ export default function UploadForm() {
                   animationDuration: "1s",
                   height: "100%",
                   transformOrigin: "center bottom",
-                  animationName: "wavePulse"
+                  animationName: "wavePulse",
                 }}
               />
             ))}
@@ -2032,19 +2204,25 @@ export default function UploadForm() {
         </div>
       )}
 
+      {/* DOWNLOAD + PREVIEW */}
       {done && (
         <div className="mt-6">
           <button
             onClick={handleDownload}
-            className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium">
+            className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium"
+          >
             Download Stems
           </button>
 
           {showPreview && (
             <div className="mt-6 bg-gray-900 p-4 rounded-lg">
               <h3 className="text-white mb-2">Preview Stems</h3>
-              {stems.map(stem => (
+              {stems.map((stem) => (
                 <div key={stem} className="mb-6 flex items-center space-x-3">
+                  <div className="min-w-[60px] text-sm text-white font-medium capitalize">
+                    {stem}
+                  </div>
+
                   <button
                     onClick={() => toggleStemPlay(stem)}
                     className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full flex items-center justify-center"
@@ -2063,7 +2241,10 @@ export default function UploadForm() {
                     </svg>
                   </button>
 
-                  <div id={`waveform-${stem}`} className="flex-1 bg-black rounded"></div>
+                  <div
+                    id={`waveform-${stem}`}
+                    className="flex-1 bg-black rounded"
+                  ></div>
 
                   <div
                     className="relative w-8 h-32 bg-gray-700 rounded-lg cursor-pointer flex flex-col justify-end items-center overflow-hidden"

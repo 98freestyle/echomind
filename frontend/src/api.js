@@ -2,14 +2,17 @@ import axios from "axios";
 
 const API_BASE = "http://127.0.0.1:5000"; // Flask dev server URL
 
-export async function uploadFile(file, selectedStems, onProgress){
+export async function uploadFile(file, selectedStems, onProgress, userEmail) {
   try {
     const formData = new FormData();
     formData.append("file", file);
     selectedStems.forEach(stem => formData.append("stems", stem));
 
     const res = await axios.post(`${API_BASE}/upload`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: {
+        "Content-Type": "multipart/form-data",
+        ...(userEmail && { "X-User-Email": userEmail })
+      },
       onUploadProgress: (e) => {
         if (onProgress && e.total) {
           const percent = Math.round((e.loaded * 100) / e.total);
@@ -18,17 +21,12 @@ export async function uploadFile(file, selectedStems, onProgress){
       }
     });
 
-    return res.data; // { job_id }
-
+    return res.data;
   } catch (err) {
-    if (err.response && err.response.data && err.response.data.error) {
-      throw new Error(err.response.data.error);
-    }
-    console.error(err.response?.data || err.message);
-    throw new Error(err.response?.data?.error || "Upload failed. Please try again.");
-
+    throw new Error(err.response?.data?.error || "Upload failed.");
   }
 }
+
 
 export function streamJob(jobId, onMessage) {
   const evtSource = new EventSource(`${API_BASE}/stream/${jobId}`);

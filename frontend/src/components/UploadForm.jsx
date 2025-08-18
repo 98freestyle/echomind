@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { uploadFile, streamJob, downloadZip } from "../api";
 import axios from "axios";
+import { useContext } from "react";
+import { AuthContext } from "../context/AuthContext.jsx";
 
 export default function UploadForm() {
   const [file, setFile] = useState(null);
@@ -16,6 +18,7 @@ export default function UploadForm() {
   const waveRefs = useRef({});
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
+  const { user } = useContext(AuthContext);
 
   // ✅ Usage state
   const [usedMB, setUsedMB] = useState(0);
@@ -23,7 +26,11 @@ export default function UploadForm() {
 
   const fetchUsage = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/usage");
+      const res = await axios.get("http://127.0.0.1:5000/usage", {
+        headers: {
+          ...(user?.email && { "X-User-Email": user.email })
+        }
+      });
       setUsedMB(res.data.used_mb);
       setLimitMB(res.data.limit_mb);
     } catch (err) {
@@ -50,9 +57,11 @@ export default function UploadForm() {
     setShowPreview(true);
     setError("");
 
+    console.log("Logged in as:", user?.email); 
+
     let res;
     try {
-      res = await uploadFile(selectedFile, stems);
+      res = await uploadFile(selectedFile, stems, null, user?.email);
       if (!res?.job_id) throw new Error("No job ID received.");
     } catch (err) {
       console.error(err);
@@ -94,6 +103,7 @@ export default function UploadForm() {
   };
 
   const handleFileSelect = (e) => {
+    console.log("FILE SELECTED");
     const selectedFile = e.target.files[0];
     if (selectedFile) startUpload(selectedFile);
   };

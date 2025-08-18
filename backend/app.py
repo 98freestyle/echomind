@@ -52,29 +52,6 @@ active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
 
-def get_guest_weekly_usage(ip):
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-
-        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
-        start_of_week_str = start_of_week.isoformat()
-
-        c.execute("""
-            SELECT SUM(mb_used) FROM usage
-            WHERE ip = ? AND user_id IS NULL AND date >= ?
-        """, (ip, start_of_week_str))
-
-        result = c.fetchone()[0]
-        return result or 0
-    except Exception as e:
-        print("Failed to fetch guest usage:", e)
-        return 0
-    finally:
-        if conn:
-            conn.close()
-
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
@@ -256,14 +233,39 @@ def upload():
     file_size_mb = round(file.tell() / (1024 * 1024), 2)
     file.seek(0)
 
-    # 👇 Guest limit check
-    is_guest = True  # We'll update this later when account auth is added
+    # 👇 Check account status
+    email = request.headers.get("X-User-Email")
+    user_id = None
+    is_guest = True
+    db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+
+    if email:
+        try:
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("SELECT id FROM users WHERE email = ?", (email,))
+            result = c.fetchone()
+            if result:
+                user_id = result[0]
+                is_guest = False
+        except Exception as e:
+            print("Failed to look up user:", e)
+        finally:
+            if conn:
+                conn.close()
+
+    # 👇 Usage check
     if is_guest:
         weekly_usage = get_guest_weekly_usage(ip)
-        if weekly_usage + file_size_mb > 150:
-            return jsonify({
-                "error": f"Weekly limit exceeded (150MB max). You’ve used {round(weekly_usage, 2)}MB."
-            }), 403
+        cap = 150
+    else:
+        weekly_usage = get_account_weekly_usage(user_id)
+        cap = 500
+
+    if weekly_usage + file_size_mb > cap:
+        return jsonify({
+            "error": f"Weekly limit exceeded ({cap}MB max). You’ve used {round(weekly_usage, 2)}MB."
+        }), 403
 
     selected_stems = request.form.getlist("stems") or ["vocals", "other"]
     job_id = str(uuid.uuid4())
@@ -299,12 +301,9 @@ def upload():
 
     # 👇 Log usage to DB
     try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         upload_date = time.strftime("%Y-%m-%d")
-        user_id = None  # Placeholder for future auth
-
         c.execute(
             "INSERT INTO usage (user_id, ip, date, mb_used) VALUES (?, ?, ?, ?)",
             (user_id, ip, upload_date, file_size_mb)
@@ -321,6 +320,7 @@ def upload():
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 
 @app.route("/stream/<job_id>")
@@ -456,33 +456,92 @@ def login():
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
     
+def get_guest_weekly_usage(ip):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE ip = ? AND user_id IS NULL AND date >= ?
+        """, (ip, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch guest usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
+    
+def get_account_weekly_usage(user_id):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE user_id = ? AND date >= ?
+        """, (user_id, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch account usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+    
 @app.route("/usage", methods=["GET"])
 @cross_origin()
 def usage():
     ip = request.remote_addr
-    is_guest = True  # We'll replace this with real auth later
+    email = request.headers.get("X-User-Email")
+    is_guest = True
+    user_id = None
+    limit = 150
+    used = 0
 
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        from datetime import datetime, timedelta
         start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
         start_of_week_str = start_of_week.isoformat()
 
+        if email:
+            c.execute("SELECT id FROM users WHERE email = ?", (email,))
+            result = c.fetchone()
+            if result:
+                user_id = result[0]
+                is_guest = False
+
         if is_guest:
-            # Sum guest usage by IP
             c.execute("""
                 SELECT SUM(mb_used) FROM usage
                 WHERE ip = ? AND user_id IS NULL AND date >= ?
             """, (ip, start_of_week_str))
-            used = c.fetchone()[0] or 0
             limit = 150
         else:
-            # Placeholder for future logic (accounts, premium)
-            used = 0
-            limit = 500
+            c.execute("""
+                SELECT SUM(mb_used) FROM usage
+                WHERE user_id = ? AND date >= ?
+            """, (user_id, start_of_week_str))
+            limit = 500  # Future: check is_premium flag
+
+        used = c.fetchone()[0] or 0
 
         return jsonify({
             "used_mb": round(used, 2),
@@ -494,6 +553,7 @@ def usage():
     finally:
         if conn:
             conn.close()
+
 
 
 @app.errorhandler(RequestEntityTooLarge)
