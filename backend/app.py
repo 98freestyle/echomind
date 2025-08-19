@@ -2,7 +2,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt
+import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets
 from flask import Flask, request, send_file, render_template, Response, jsonify, make_response
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
@@ -12,8 +12,12 @@ from audio_splitter import split_audio
 from dotenv import load_dotenv
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from disposable_email_domains import blocklist
+from datetime import datetime, timedelta
+
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -51,6 +55,13 @@ UPLOAD_HISTORY = defaultdict(lambda: deque())
 active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
+
+def get_db_connection():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(BASE_DIR, "db", "users.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
@@ -392,9 +403,8 @@ def preview(job_id, stem):
 
 # SIGNUP
 @app.route("/signup", methods=["POST"])
-@cross_origin()
 def signup():
-    data = request.json
+    data = request.get_json()
     username = data.get("username")
     email = data.get("email")
     password = data.get("password")
@@ -402,26 +412,57 @@ def signup():
     if not username or not email or not password:
         return jsonify({"error": "All fields are required."}), 400
 
-    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    # Check for disposable email
+    domain = email.split("@")[-1]
+    if domain in blocklist:
+        return jsonify({"error": "Disposable email addresses are not allowed."}), 400
 
-    conn = None
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-                  (username, email, hashed_pw))
-        conn.commit()
-        return jsonify({"success": True}), 201
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Username or email already exists."}), 409
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Check if IP has signed up in last 7 days // COMMENTING OUT JUST FOR TESTING LOCALLY 
+    ip = request.remote_addr
+    #c.execute('''
+    #    SELECT * FROM signup_attempts
+    #    WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
+    #''', (ip,))
+    #if c.fetchone():
+    #    conn.close()
+    #    return jsonify({"error": "Too many signups from this IP. Try again in 7 days."}), 429
+
+    # Check if email or username already exists
+    c.execute("SELECT * FROM users WHERE email = ? OR username = ?", (email, username))
+    if c.fetchone():
+        conn.close()
+        return jsonify({"error": "Email or username already in use."}), 409
+
+    # Create user with is_verified = 0
+    hashed_pw = generate_password_hash(password)
+    c.execute("INSERT INTO users (username, email, password, is_verified) VALUES (?, ?, ?, 0)",
+              (username, email, hashed_pw))
+    user_id = c.lastrowid
+
+    # Insert into signup_attempts
+    c.execute("INSERT INTO signup_attempts (ip_address, attempted_at) VALUES (?, datetime('now'))", (ip,))
+
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    c.execute('''
+        INSERT INTO verification_tokens (user_id, token, expires_at, used)
+        VALUES (?, ?, ?, 0)
+    ''', (user_id, token, expires_at))
+
+    conn.commit()
+    conn.close()
+
+    # Normally you'd send email here
+    print(f"DEBUG: Email verification link → http://localhost:3000/verify-email/{token}")
+
+    return jsonify({
+    "user": username,
+    "verified": False
+    }), 200
 
 # LOGIN
 @app.route("/login", methods=["POST"])
@@ -438,16 +479,20 @@ def login():
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("SELECT password FROM users WHERE email = ?", (email,))
+        c.execute("SELECT password, is_verified FROM users WHERE email = ?", (email,))
         result = c.fetchone()
         conn.close()
 
         if not result:
             return jsonify({"error": "Invalid credentials."}), 401
 
-        stored_pw = result[0]
-        if not bcrypt.checkpw(password.encode("utf-8"), stored_pw.encode("utf-8")):
+        stored_pw, is_verified = result
+
+        if not check_password_hash(stored_pw, password):
             return jsonify({"error": "Invalid credentials."}), 401
+
+        if not is_verified:
+            return jsonify({"error": "Please verify your email before logging in."}), 403
 
         return jsonify({"success": True}), 200
 
@@ -455,6 +500,163 @@ def login():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+@app.route("/verify-email/<token>", methods=["GET"])
+@cross_origin()
+def verify_email(token):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        # Find token
+        c.execute("SELECT user_id, expires_at, used FROM verification_tokens WHERE token = ?", (token,))
+        result = c.fetchone()
+
+        if not result:
+            conn.close()
+            return jsonify({"error": "Invalid or expired token."}), 400
+
+        user_id, expires_at, used = result
+
+        if used:
+            conn.close()
+            return jsonify({"error": "This token has already been used."}), 400
+
+        if datetime.utcnow() > datetime.fromisoformat(expires_at):
+            conn.close()
+            return jsonify({"error": "Token has expired."}), 400
+
+        # Mark user as verified
+        c.execute("UPDATE users SET is_verified = 1 WHERE id = ?", (user_id,))
+        c.execute("UPDATE verification_tokens SET used = 1 WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Email verified successfully."}), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+    
+@app.route("/reset-password-request", methods=["POST"])
+def reset_password_request():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "Email is required."}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Check if user exists
+    c.execute("SELECT id FROM users WHERE email = ?", (email,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": "Email not found."}), 404
+
+    user_id = user[0]
+
+    # Create reset token
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+
+    c.execute('''
+        INSERT INTO password_reset_tokens (user_id, token, expires_at, used)
+        VALUES (?, ?, ?, 0)
+    ''', (user_id, token, expires_at))
+
+    conn.commit()
+    conn.close()
+
+    # Normally send email
+    print(f"DEBUG: Password reset link → http://localhost:3000/reset-password/{token}")
+
+    return jsonify({
+        "message": "Password reset link sent to your email.",
+        "success": True
+    }), 200
+
+
+    
+@app.route("/request-password-reset", methods=["POST"])
+def request_password_reset():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "Email is required."}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, is_verified FROM users WHERE email = ?", (email,))
+    user = c.fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"error": "No user found with that email."}), 404
+
+    if user["is_verified"] == 0:
+        conn.close()
+        return jsonify({"error": "Please verify your email before resetting password."}), 403
+
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+
+    c.execute('''
+        INSERT INTO password_reset_tokens (user_id, token, expires_at)
+        VALUES (?, ?, ?)
+    ''', (user["id"], token, expires_at))
+
+    conn.commit()
+    conn.close()
+
+    print(f"DEBUG: Password reset link → http://localhost:3000/reset-password/{token}")
+    return jsonify({"message": "Reset link sent (check console)."}), 200
+
+@app.route("/reset-password/<token>", methods=["POST"])
+def reset_password(token):
+    data = request.get_json()
+    new_password = data.get("password")
+
+    if not new_password or len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters."}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''
+        SELECT prt.id, prt.user_id, prt.expires_at, prt.used
+        FROM password_reset_tokens prt
+        WHERE prt.token = ?
+    ''', (token,))
+    record = c.fetchone()
+
+    if not record:
+        conn.close()
+        return jsonify({"error": "Invalid or expired token."}), 400
+
+    if record["used"]:
+        conn.close()
+        return jsonify({"error": "This reset link has already been used."}), 400
+
+    if datetime.utcnow() > datetime.fromisoformat(record["expires_at"]):
+        conn.close()
+        return jsonify({"error": "This reset link has expired."}), 400
+
+    hashed_pw = generate_password_hash(new_password)
+
+    # Update user's password
+    c.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_pw, record["user_id"]))
+    c.execute("UPDATE password_reset_tokens SET used = 1 WHERE id = ?", (record["id"],))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Password reset successful."}), 200
+
     
 def get_guest_weekly_usage(ip):
     try:

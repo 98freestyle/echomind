@@ -79,7 +79,15 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-2 bg-gray-900 rounded"
                 />
-
+                <div className="text-sm text-right">
+                    <button
+                        type="button"
+                        onClick={() => navigate("/reset-password")}
+                        className="text-indigo-400 hover:underline"
+                    >
+                        Forgot password?
+                    </button>
+                </div>
                 <button
                     type="submit"
                     disabled={loading}

@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
     const [email, setEmail] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -31,6 +34,11 @@ export default function Signup() {
             return;
         }
 
+        if (password !== confirmPassword) {
+            setError("Passwords do not match.");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -40,12 +48,20 @@ export default function Signup() {
                 password
             });
 
-            if (res.data.success) {
+            if (res.status === 200 && res.data?.user) {
                 setSuccess(true);
                 setEmail("");
                 setUsername("");
                 setPassword("");
+
+                // 🔁 Optional: redirect after a short delay
+                setTimeout(() => {
+                    navigate("/login");
+                }, 1500);
+            } else {
+                setError("Unexpected response from server.");
             }
+
         } catch (err) {
             setError(err.response?.data?.error || "Signup failed.");
         } finally {
@@ -83,6 +99,13 @@ export default function Signup() {
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-2 bg-gray-900 rounded"
+                />
+                <input
+                    type="password"
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full p-2 bg-gray-900 rounded"
                 />
 

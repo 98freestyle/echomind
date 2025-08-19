@@ -27,6 +27,8 @@ CORE_FILES = {
     "frontend/src/components/Signup.jsx",
     "frontend/src/components/ProtectedRoute.jsx",
     "frontend/src/components/Dashboard.jsx",
+    "frontend/src/components/ResetPasswordRequest.jsx",
+    "frontend/src/components/ResetPasswordConfirm.jsx",
     "frontend/src/context/AuthContext.jsx",
     "frontend/index.html",
     "frontend/package.json",

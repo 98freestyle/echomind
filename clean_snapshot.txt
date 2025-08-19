@@ -21,7 +21,6 @@ JOB_EXPIRATION=300
 ## 📄 clean_snapshot.txt
 
 ------------------------------------------------------------
-  clean_snapshot18-08-25.txt
 
 ## 📄 INSTRUCTIONS.md
 
@@ -376,6 +375,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\5a
   49f4eb43bbf6b71fe4e1eb1ea7d43baa7ca1b1
 
+# 📁 .git\objects\5b
+  69e6c2d42c35e9a3391ee7377cc759a73f8e94
+
 # 📁 .git\objects\5c
   79bc083132fc9b16a3a84aeb713d25fe2117a8
 
@@ -437,6 +439,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\7a
   26780e5f75d434491a450f924138eb60826362
 
+# 📁 .git\objects\7e
+  99a70d5226d3b4d8d157fec7f554187c9d37f7
+
 # 📁 .git\objects\82
   397b32f876864244bb8618e952f9e3642e5aad
 
@@ -455,20 +460,36 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\90
   6c2f52d2592c0e1513f10c8b621768ee97f328
 
+# 📁 .git\objects\94
+  292b39a076029a20f2689eb32ff492bb41819f
+
+# 📁 .git\objects\95
+  65d74415ccd8941adc777429b86821b1073c5f
+
 # 📁 .git\objects\96
   41d3f498da52659d74b0f1a4369ff4392ea535
 
 # 📁 .git\objects\9c
+  9e80c613941e1fba700725e527ca383e5bda07
   ba089177d520973c13d0f538a9808cb56d67e9
 
 # 📁 .git\objects\9f
   495b335313ca23ae14b267fe5aa2941edce7af
 
+# 📁 .git\objects\a0
+  6273da776d9525b23b6c964383966d00a91d89
+
 # 📁 .git\objects\a1
   7aead092b946bef40273d68a066300ede05c04
 
+# 📁 .git\objects\aa
+  dc632de59121e09a1cf24c82c0923d7ad695d7
+
 # 📁 .git\objects\ac
   eed33e848efd874d018766f8351faa81f31a96
+
+# 📁 .git\objects\ae
+  7cb5160b6e50d0f27a0deb85347ebd4fb52ab7
 
 # 📁 .git\objects\b2
   47b4b1f65f62f26cda428a6ac643d4a66bf0ff
@@ -506,6 +527,9 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 # 📁 .git\objects\c9
   7f759a7071bff6e8169e67599fae0e8e24107d
 
+# 📁 .git\objects\cb
+  e900688549fc028c6c7ad01e4412f5bd00020a
+
 # 📁 .git\objects\cd
   a1279e35c9255806161f05568df09404f1ebfc
 
@@ -524,6 +548,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\d5
   633349db9cb2d14b04546c839d7c54c32bb14f
+  adbd5a47b1a01b8a5c7f89c16c7291a8f1245c
 
 # 📁 .git\objects\d6
   85d73fc1d7f1c654a2135b7849a09825c6a6e0
@@ -536,6 +561,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
 
 # 📁 .git\objects\d9
   158cdb8365ce62c74fb279453b8af74cfc5e75
+  4d220c1238a30f0223bf25a4adbab54174dcba
 
 # 📁 .git\objects\df
   b7cb4fdf31f987308a6ba08aaefd0e3cf3fc59
@@ -560,6 +586,7 @@ print(f"✅ Clean snapshot created: {OUTPUT_FILE}")
   cd6ff325e804eda13f99346bfd62d319516b56
 
 # 📁 .git\objects\ed
+  8d8d172ebde41a6dbfb160aaa972c65866d0b8
   c1cace3902f663f5edb1ae0afe7f65dd8f940a
 
 # 📁 .git\objects\ee
@@ -604,7 +631,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt
+import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets
 from flask import Flask, request, send_file, render_template, Response, jsonify, make_response
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
@@ -614,8 +641,12 @@ from audio_splitter import split_audio
 from dotenv import load_dotenv
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from disposable_email_domains import blocklist
+from datetime import datetime, timedelta
+
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -654,28 +685,12 @@ active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
 
-def get_guest_weekly_usage(ip):
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-
-        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
-        start_of_week_str = start_of_week.isoformat()
-
-        c.execute("""
-            SELECT SUM(mb_used) FROM usage
-            WHERE ip = ? AND user_id IS NULL AND date >= ?
-        """, (ip, start_of_week_str))
-
-        result = c.fetchone()[0]
-        return result or 0
-    except Exception as e:
-        print("Failed to fetch guest usage:", e)
-        return 0
-    finally:
-        if conn:
-            conn.close()
+def get_db_connection():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(BASE_DIR, "db", "users.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
@@ -858,14 +873,39 @@ def upload():
     file_size_mb = round(file.tell() / (1024 * 1024), 2)
     file.seek(0)
 
-    # 👇 Guest limit check
-    is_guest = True  # We'll update this later when account auth is added
+    # 👇 Check account status
+    email = request.headers.get("X-User-Email")
+    user_id = None
+    is_guest = True
+    db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+
+    if email:
+        try:
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("SELECT id FROM users WHERE email = ?", (email,))
+            result = c.fetchone()
+            if result:
+                user_id = result[0]
+                is_guest = False
+        except Exception as e:
+            print("Failed to look up user:", e)
+        finally:
+            if conn:
+                conn.close()
+
+    # 👇 Usage check
     if is_guest:
         weekly_usage = get_guest_weekly_usage(ip)
-        if weekly_usage + file_size_mb > 150:
-            return jsonify({
-                "error": f"Weekly limit exceeded (150MB max). You’ve used {round(weekly_usage, 2)}MB."
-            }), 403
+        cap = 150
+    else:
+        weekly_usage = get_account_weekly_usage(user_id)
+        cap = 500
+
+    if weekly_usage + file_size_mb > cap:
+        return jsonify({
+            "error": f"Weekly limit exceeded ({cap}MB max). You’ve used {round(weekly_usage, 2)}MB."
+        }), 403
 
     selected_stems = request.form.getlist("stems") or ["vocals", "other"]
     job_id = str(uuid.uuid4())
@@ -901,12 +941,9 @@ def upload():
 
     # 👇 Log usage to DB
     try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         upload_date = time.strftime("%Y-%m-%d")
-        user_id = None  # Placeholder for future auth
-
         c.execute(
             "INSERT INTO usage (user_id, ip, date, mb_used) VALUES (?, ?, ?, ?)",
             (user_id, ip, upload_date, file_size_mb)
@@ -923,6 +960,7 @@ def upload():
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 
 @app.route("/stream/<job_id>")
@@ -994,9 +1032,8 @@ def preview(job_id, stem):
 
 # SIGNUP
 @app.route("/signup", methods=["POST"])
-@cross_origin()
 def signup():
-    data = request.json
+    data = request.get_json()
     username = data.get("username")
     email = data.get("email")
     password = data.get("password")
@@ -1004,26 +1041,58 @@ def signup():
     if not username or not email or not password:
         return jsonify({"error": "All fields are required."}), 400
 
-    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    # Check for disposable email
+    domain = email.split("@")[-1]
+    if domain in blocklist:
+        return jsonify({"error": "Disposable email addresses are not allowed."}), 400
 
-    conn = None
-    try:
-        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-                  (username, email, hashed_pw))
-        conn.commit()
-        return jsonify({"success": True}), 201
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Username or email already exists."}), 409
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Check if IP has signed up in last 7 days
+    ip = request.remote_addr
+    #c.execute('''
+    #    SELECT * FROM signup_attempts
+    #    WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
+    #''', (ip,))
+    #if c.fetchone():
+    #    conn.close()
+    #    return jsonify({"error": "Too many signups from this IP. Try again in 7 days."}), 429
+
+    # Check if email or username already exists
+    c.execute("SELECT * FROM users WHERE email = ? OR username = ?", (email, username))
+    if c.fetchone():
+        conn.close()
+        return jsonify({"error": "Email or username already in use."}), 409
+
+    # Create user with is_verified = 0
+    hashed_pw = generate_password_hash(password)
+    c.execute("INSERT INTO users (username, email, password, is_verified) VALUES (?, ?, ?, 0)",
+              (username, email, hashed_pw))
+    user_id = c.lastrowid
+
+    # Insert into signup_attempts
+    c.execute("INSERT INTO signup_attempts (ip_address, attempted_at) VALUES (?, datetime('now'))", (ip,))
+
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    c.execute('''
+        INSERT INTO verification_tokens (user_id, token, expires_at, used)
+        VALUES (?, ?, ?, 0)
+    ''', (user_id, token, expires_at))
+
+    conn.commit()
+    conn.close()
+
+    # Normally you'd send email here
+    print(f"DEBUG: Email verification link → http://localhost:3000/verify-email/{token}")
+
+    return jsonify({
+    "user": username,
+    "verified": False
+    }), 200
+
 
 # LOGIN
 @app.route("/login", methods=["POST"])
@@ -1058,33 +1127,92 @@ def login():
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
     
+def get_guest_weekly_usage(ip):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE ip = ? AND user_id IS NULL AND date >= ?
+        """, (ip, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch guest usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
+    
+def get_account_weekly_usage(user_id):
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        c.execute("""
+            SELECT SUM(mb_used) FROM usage
+            WHERE user_id = ? AND date >= ?
+        """, (user_id, start_of_week_str))
+
+        result = c.fetchone()[0]
+        return result or 0
+    except Exception as e:
+        print("Failed to fetch account usage:", e)
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+    
 @app.route("/usage", methods=["GET"])
 @cross_origin()
 def usage():
     ip = request.remote_addr
-    is_guest = True  # We'll replace this with real auth later
+    email = request.headers.get("X-User-Email")
+    is_guest = True
+    user_id = None
+    limit = 150
+    used = 0
 
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        from datetime import datetime, timedelta
         start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
         start_of_week_str = start_of_week.isoformat()
 
+        if email:
+            c.execute("SELECT id FROM users WHERE email = ?", (email,))
+            result = c.fetchone()
+            if result:
+                user_id = result[0]
+                is_guest = False
+
         if is_guest:
-            # Sum guest usage by IP
             c.execute("""
                 SELECT SUM(mb_used) FROM usage
                 WHERE ip = ? AND user_id IS NULL AND date >= ?
             """, (ip, start_of_week_str))
-            used = c.fetchone()[0] or 0
             limit = 150
         else:
-            # Placeholder for future logic (accounts, premium)
-            used = 0
-            limit = 500
+            c.execute("""
+                SELECT SUM(mb_used) FROM usage
+                WHERE user_id = ? AND date >= ?
+            """, (user_id, start_of_week_str))
+            limit = 500  # Future: check is_premium flag
+
+        used = c.fetchone()[0] or 0
 
         return jsonify({
             "used_mb": round(used, 2),
@@ -1096,6 +1224,7 @@ def usage():
     finally:
         if conn:
             conn.close()
+
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -1194,9 +1323,54 @@ def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None
     return output_path
 
 ------------------------------------------------------------
-  packages_list.txt
 
 ## 📄 backend/requirements.txt
+antlr4-python3-runtime==4.9.3
+bcrypt==4.3.0
+blinker==1.9.0
+certifi==2025.7.14
+cffi==1.17.1
+charset-normalizer==3.4.2
+click==8.2.1
+cloudpickle==3.1.1
+colorama==0.4.6
+demucs==4.0.1
+dora_search==0.1.12
+einops==0.8.1
+filelock==3.18.0
+Flask==3.1.1
+Flask-Bcrypt==1.0.1
+flask-cors==6.0.1
+Flask-JWT-Extended==4.7.1
+fsspec==2025.7.0
+idna==3.10
+itsdangerous==2.2.0
+Jinja2==3.1.6
+julius==0.2.7
+lameenc==1.8.1
+MarkupSafe==3.0.2
+mpmath==1.3.0
+networkx==3.5
+numpy==1.26.4
+omegaconf==2.3.0
+openunmix==1.3.0
+pycparser==2.22
+pydub==0.25.1
+PyJWT==2.10.1
+python-dotenv==1.1.1
+PyYAML==6.0.2
+requests==2.32.4
+retrying==1.4.2
+soundfile==0.13.1
+submitit==1.5.3
+sympy==1.14.0
+torch==2.7.1
+torchaudio==2.7.1
+tqdm==4.67.1
+treetable==0.2.5
+typing_extensions==4.14.1
+urllib3==2.5.0
+Werkzeug==3.1.3
 
 ------------------------------------------------------------
 
@@ -1222,7 +1396,8 @@ c.execute('''
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        is_verified BOOLEAN DEFAULT 0
     )
 ''')
 
@@ -1236,6 +1411,28 @@ c.execute('''
         mb_used INTEGER
     )
 ''')
+
+# verification token table 
+c.execute('''
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used BOOLEAN DEFAULT 0,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+''')
+
+# signup attemps table 
+c.execute('''
+    CREATE TABLE IF NOT EXISTS signup_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_address TEXT NOT NULL,
+        attempted_at DATETIME NOT NULL
+    )
+''')
+
 
 conn.commit()
 conn.close()
@@ -1326,7 +1523,7 @@ export default {
 
 # 📁 frontend\dist\assets
   index-DcRjaYIz.css
-  index-DQ5sLb87.js
+  index-DqWLNwz3.js
 
 # 📁 frontend\public
   favicon.ico
@@ -1339,14 +1536,17 @@ import axios from "axios";
 
 const API_BASE = "http://127.0.0.1:5000"; // Flask dev server URL
 
-export async function uploadFile(file, selectedStems, onProgress){
+export async function uploadFile(file, selectedStems, onProgress, userEmail) {
   try {
     const formData = new FormData();
     formData.append("file", file);
     selectedStems.forEach(stem => formData.append("stems", stem));
 
     const res = await axios.post(`${API_BASE}/upload`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: {
+        "Content-Type": "multipart/form-data",
+        ...(userEmail && { "X-User-Email": userEmail })
+      },
       onUploadProgress: (e) => {
         if (onProgress && e.total) {
           const percent = Math.round((e.loaded * 100) / e.total);
@@ -1355,17 +1555,12 @@ export async function uploadFile(file, selectedStems, onProgress){
       }
     });
 
-    return res.data; // { job_id }
-
+    return res.data;
   } catch (err) {
-    if (err.response && err.response.data && err.response.data.error) {
-      throw new Error(err.response.data.error);
-    }
-    console.error(err.response?.data || err.message);
-    throw new Error(err.response?.data?.error || "Upload failed. Please try again.");
-
+    throw new Error(err.response?.data?.error || "Upload failed.");
   }
 }
+
 
 export function streamJob(jobId, onMessage) {
   const evtSource = new EventSource(`${API_BASE}/stream/${jobId}`);
@@ -1786,6 +1981,7 @@ export default function ProtectedRoute({ children }) {
 ## 📄 frontend/src/components/Signup.jsx
 import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
     const [email, setEmail] = useState("");
@@ -1794,6 +1990,7 @@ export default function Signup() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -1826,12 +2023,20 @@ export default function Signup() {
                 password
             });
 
-            if (res.data.success) {
+            if (res.status === 200 && res.data?.user) {
                 setSuccess(true);
                 setEmail("");
                 setUsername("");
                 setPassword("");
+
+                // 🔁 Optional: redirect after a short delay
+                setTimeout(() => {
+                    navigate("/login");
+                }, 1500);
+            } else {
+                setError("Unexpected response from server.");
             }
+
         } catch (err) {
             setError(err.response?.data?.error || "Signup failed.");
         } finally {
@@ -1918,6 +2123,8 @@ import React, { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { uploadFile, streamJob, downloadZip } from "../api";
 import axios from "axios";
+import { useContext } from "react";
+import { AuthContext } from "../context/AuthContext.jsx";
 
 export default function UploadForm() {
   const [file, setFile] = useState(null);
@@ -1932,6 +2139,7 @@ export default function UploadForm() {
   const waveRefs = useRef({});
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
+  const { user } = useContext(AuthContext);
 
   // ✅ Usage state
   const [usedMB, setUsedMB] = useState(0);
@@ -1939,7 +2147,11 @@ export default function UploadForm() {
 
   const fetchUsage = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/usage");
+      const res = await axios.get("http://127.0.0.1:5000/usage", {
+        headers: {
+          ...(user?.email && { "X-User-Email": user.email })
+        }
+      });
       setUsedMB(res.data.used_mb);
       setLimitMB(res.data.limit_mb);
     } catch (err) {
@@ -1966,9 +2178,11 @@ export default function UploadForm() {
     setShowPreview(true);
     setError("");
 
+    console.log("Logged in as:", user?.email); 
+
     let res;
     try {
-      res = await uploadFile(selectedFile, stems);
+      res = await uploadFile(selectedFile, stems, null, user?.email);
       if (!res?.job_id) throw new Error("No job ID received.");
     } catch (err) {
       console.error(err);
@@ -2010,6 +2224,7 @@ export default function UploadForm() {
   };
 
   const handleFileSelect = (e) => {
+    console.log("FILE SELECTED");
     const selectedFile = e.target.files[0];
     if (selectedFile) startUpload(selectedFile);
   };

@@ -13,7 +13,8 @@ c.execute('''
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        is_verified BOOLEAN DEFAULT 0
     )
 ''')
 
@@ -25,6 +26,39 @@ c.execute('''
         ip TEXT,
         date TEXT,
         mb_used INTEGER
+    )
+''')
+
+# Verification tokens table
+c.execute('''
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used BOOLEAN DEFAULT 0,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+''')
+
+# Signup attempts table
+c.execute('''
+    CREATE TABLE IF NOT EXISTS signup_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_address TEXT NOT NULL,
+        attempted_at DATETIME NOT NULL
+    )
+''')
+
+#  Password reset tokens table 
+c.execute('''
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )
 ''')
 
