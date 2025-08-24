@@ -224,8 +224,20 @@ export default function UploadForm() {
             style={{ width: `${usagePercent}%` }}
           ></div>
         </div>
-      </div>
+        {/* ⛔ Near-limit warning */}
+        {usagePercent >= 85 && (
+          <p className="text-sm text-red-500 font-medium mt-1">
+            ⚠️ You’re close to your weekly limit!
+          </p>
+        )}
 
+        {/* 🕒 Reset info */}
+        <p className="text-xs text-gray-400 mt-1">
+          Usage resets every Monday at 12:00 AM (AEST)
+        </p>
+      </div>
+      
+      
       {/* ERROR */}
       {error && (
         <div className="mb-4 p-3 bg-red-600 bg-opacity-80 rounded text-white text-sm">

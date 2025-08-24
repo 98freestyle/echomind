@@ -1,4 +1,4 @@
-antlr4-python3-runtime==4.9.3
+﻿antlr4-python3-runtime==4.9.3
 bcrypt==4.3.0
 blinker==1.9.0
 certifi==2025.7.14
@@ -8,6 +8,7 @@ click==8.2.1
 cloudpickle==3.1.1
 colorama==0.4.6
 demucs==4.0.1
+disposable-email-domains==0.0.131
 dora_search==0.1.12
 einops==0.8.1
 filelock==3.18.0
@@ -15,6 +16,7 @@ Flask==3.1.1
 Flask-Bcrypt==1.0.1
 flask-cors==6.0.1
 Flask-JWT-Extended==4.7.1
+Flask-Mail==0.10.0
 fsspec==2025.7.0
 idna==3.10
 itsdangerous==2.2.0
