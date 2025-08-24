@@ -3,7 +3,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
 import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets
-from flask import Flask, request, send_file, render_template, Response, jsonify, make_response
+from flask import Flask, request, send_file, render_template, Response, jsonify, make_response, redirect
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
 from pydub.utils import mediainfo
@@ -17,6 +17,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from disposable_email_domains import blocklist
 from datetime import datetime, timedelta
+from utils.email_utils import send_email
 
 
 app = Flask(__name__)
@@ -37,6 +38,8 @@ MAX_UPLOADS_PER_MIN = int(os.getenv("MAX_UPLOADS_PER_MIN", 5))
 TEMP_DIR = os.getenv("TEMP_DIR", "temp")
 LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # fallback 5 min
+BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
+
 
 
 
@@ -457,7 +460,14 @@ def signup():
     conn.close()
 
     # Normally you'd send email here
-    print(f"DEBUG: Email verification link → http://localhost:3000/verify-email/{token}")
+    verify_link = f"{BASE_URL}/verify-email?token={token}"
+    html_body = f"""
+    <h3>Welcome to EchoMind 🎧</h3>
+    <p>Click below to verify your EchoMind account:</p>
+    <a href="{verify_link}">Verify Email</a>
+    """
+
+    send_email(email, "Verify your EchoMind account", html_body)
 
     return jsonify({
     "user": username,
@@ -501,9 +511,10 @@ def login():
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
-@app.route("/verify-email/<token>", methods=["GET"])
+@app.route("/verify-email", methods=["GET"])
 @cross_origin()
-def verify_email(token):
+def verify_email():
+    token = request.args.get("token")
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
@@ -533,7 +544,7 @@ def verify_email(token):
         conn.commit()
         conn.close()
 
-        return jsonify({"success": True, "message": "Email verified successfully."}), 200
+        return redirect(f"{BASE_URL}/login?verified=true")
 
     except Exception as e:
         import traceback
@@ -573,7 +584,14 @@ def reset_password_request():
     conn.close()
 
     # Normally send email
-    print(f"DEBUG: Password reset link → http://localhost:3000/reset-password/{token}")
+    reset_link = f"{BASE_URL}/reset-password-confirm/{token}"
+    html_body = f"""
+    <h3>Password Reset Requested 🔐</h3>
+    <p>If you didn't request this, ignore it. Otherwise click below to reset your password:</p>
+    <a href="{reset_link}">Reset Password</a>
+    """
+
+    send_email(email, "Reset your EchoMind password", html_body)
 
     return jsonify({
         "message": "Password reset link sent to your email.",
@@ -617,10 +635,10 @@ def request_password_reset():
     print(f"DEBUG: Password reset link → http://localhost:3000/reset-password/{token}")
     return jsonify({"message": "Reset link sent (check console)."}), 200
 
-@app.route("/reset-password/<token>", methods=["POST"])
+@app.route("/reset-password-confirm/<token>", methods=["POST"])
 def reset_password(token):
     data = request.get_json()
-    new_password = data.get("password")
+    new_password = data.get("new_password")
 
     if not new_password or len(new_password) < 6:
         return jsonify({"error": "Password must be at least 6 characters."}), 400
@@ -655,7 +673,8 @@ def reset_password(token):
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "Password reset successful."}), 200
+    return jsonify({"success": True, "message": "Password reset successful."}), 200
+
 
     
 def get_guest_weekly_usage(ip):
