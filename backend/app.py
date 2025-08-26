@@ -251,17 +251,19 @@ def upload():
     email = request.headers.get("X-User-Email")
     user_id = None
     is_guest = True
+    is_premium = False
     db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
 
     if email:
         try:
             conn = sqlite3.connect(db_path)
             c = conn.cursor()
-            c.execute("SELECT id FROM users WHERE email = ?", (email,))
+            c.execute("SELECT id, is_premium FROM users WHERE email = ?", (email,))
             result = c.fetchone()
             if result:
-                user_id = result[0]
+                user_id, is_premium_flag = result
                 is_guest = False
+                is_premium = bool(is_premium_flag)
         except Exception as e:
             print("Failed to look up user:", e)
         finally:
@@ -273,8 +275,7 @@ def upload():
         weekly_usage = get_guest_weekly_usage(ip)
         cap = 150
     else:
-        weekly_usage = get_account_weekly_usage(user_id)
-        cap = 500
+        weekly_usage, cap = get_account_weekly_usage(user_id)
 
     if weekly_usage + file_size_mb > cap:
         return jsonify({
@@ -329,11 +330,19 @@ def upload():
         if conn:
             conn.close()
 
+    # ✅ Register job with priority flag
     with jobs_lock:
-        JOBS[job_id] = {"status": "processing", "zip": None, "events": queue.Queue(), "ip": ip}
+        JOBS[job_id] = {
+            "status": "processing",
+            "zip": None,
+            "events": queue.Queue(),
+            "ip": ip,
+            "priority": is_premium
+        }
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 
 
@@ -708,19 +717,30 @@ def get_account_weekly_usage(user_id):
         start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
         start_of_week_str = start_of_week.isoformat()
 
+        # Fetch is_premium
+        c.execute("SELECT is_premium FROM users WHERE id = ?", (user_id,))
+        is_premium = c.fetchone()
+        is_premium = is_premium[0] if is_premium else 0
+
+        # Fetch usage
         c.execute("""
             SELECT SUM(mb_used) FROM usage
             WHERE user_id = ? AND date >= ?
         """, (user_id, start_of_week_str))
 
-        result = c.fetchone()[0]
-        return result or 0
+        used = c.fetchone()[0] or 0
+        limit = 3000 if is_premium else 500
+
+        return used, limit
+
     except Exception as e:
         print("Failed to fetch account usage:", e)
-        return 0
+        return 0, 500  # fallback
+
     finally:
         if conn:
             conn.close()
+
 
     
 @app.route("/usage", methods=["GET"])
@@ -753,15 +773,23 @@ def usage():
                 SELECT SUM(mb_used) FROM usage
                 WHERE ip = ? AND user_id IS NULL AND date >= ?
             """, (ip, start_of_week_str))
+            used = c.fetchone()[0] or 0
             limit = 150
         else:
-            c.execute("""
-                SELECT SUM(mb_used) FROM usage
-                WHERE user_id = ? AND date >= ?
-            """, (user_id, start_of_week_str))
-            limit = 500  # Future: check is_premium flag
+            c.execute("SELECT id, is_premium FROM users WHERE email = ?", (email,))
+            result = c.fetchone()
+            if result:
+                user_id, is_premium = result
+                limit = 3000 if is_premium else 500
 
-        used = c.fetchone()[0] or 0
+                c.execute("""
+                    SELECT SUM(mb_used) FROM usage
+                    WHERE user_id = ? AND date >= ?
+                """, (user_id, start_of_week_str))
+                used = c.fetchone()[0] or 0
+            else:
+                used = 0
+                limit = 500  # fallback
 
         return jsonify({
             "used_mb": round(used, 2),
@@ -773,6 +801,7 @@ def usage():
     finally:
         if conn:
             conn.close()
+
 
 
 

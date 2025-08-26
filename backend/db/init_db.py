@@ -13,7 +13,8 @@ c.execute('''
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        is_verified BOOLEAN DEFAULT 0
+        is_verified BOOLEAN DEFAULT 0,
+        is_premium BOOLEAN DEFAULT 0
     )
 ''')
 
