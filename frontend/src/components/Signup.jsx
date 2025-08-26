@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
     const [email, setEmail] = useState("");
-    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
@@ -19,7 +18,7 @@ export default function Signup() {
         setError("");
         setSuccess(false);
 
-        if (!email || !username || !password) {
+        if (!email || !password) {
             setError("All fields are required.");
             return;
         }
@@ -44,14 +43,12 @@ export default function Signup() {
         try {
             const res = await axios.post("http://127.0.0.1:5000/signup", {
                 email,
-                username,
                 password
             });
 
             if (res.status === 200 && res.data?.user) {
                 setSuccess(true);
                 setEmail("");
-                setUsername("");
                 setPassword("");
 
                 // 🔁 Optional: redirect after a short delay
@@ -80,13 +77,6 @@ export default function Signup() {
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
                 {success && <div className="bg-green-600 p-2 rounded text-sm">Signup successful! 🎉</div>}
 
-                <input
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full p-2 bg-gray-900 rounded"
-                />
                 <input
                     type="email"
                     placeholder="Email"

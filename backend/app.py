@@ -408,11 +408,10 @@ def preview(job_id, stem):
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.get_json()
-    username = data.get("username")
     email = data.get("email")
     password = data.get("password")
 
-    if not username or not email or not password:
+    if not email or not password:
         return jsonify({"error": "All fields are required."}), 400
 
     # Check for disposable email
@@ -433,16 +432,16 @@ def signup():
     #    conn.close()
     #    return jsonify({"error": "Too many signups from this IP. Try again in 7 days."}), 429
 
-    # Check if email or username already exists
-    c.execute("SELECT * FROM users WHERE email = ? OR username = ?", (email, username))
+    # Check if email already exists
+    c.execute("SELECT * FROM users WHERE email = ?", (email,))
     if c.fetchone():
         conn.close()
-        return jsonify({"error": "Email or username already in use."}), 409
+        return jsonify({"error": "Email already in use."}), 409
 
     # Create user with is_verified = 0
     hashed_pw = generate_password_hash(password)
-    c.execute("INSERT INTO users (username, email, password, is_verified) VALUES (?, ?, ?, 0)",
-              (username, email, hashed_pw))
+    c.execute("INSERT INTO users (email, password, is_verified) VALUES (?, ?, 0)",
+            (email, hashed_pw))
     user_id = c.lastrowid
 
     # Insert into signup_attempts
@@ -470,7 +469,7 @@ def signup():
     send_email(email, "Verify your EchoMind account", html_body)
 
     return jsonify({
-    "user": username,
+    "user": email,
     "verified": False
     }), 200
 
