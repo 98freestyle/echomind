@@ -2,7 +2,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets
+import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets, stripe
 from flask import Flask, request, send_file, render_template, Response, jsonify, make_response, redirect
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
@@ -39,6 +39,7 @@ TEMP_DIR = os.getenv("TEMP_DIR", "temp")
 LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # fallback 5 min
 BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 
 
@@ -793,7 +794,8 @@ def usage():
 
         return jsonify({
             "used_mb": round(used, 2),
-            "limit_mb": limit
+            "limit_mb": limit,
+            "is_premium": bool(is_premium) if not is_guest else False
         })
 
     except Exception as e:
@@ -802,7 +804,96 @@ def usage():
         if conn:
             conn.close()
 
+@app.route("/promote-to-premium", methods=["POST"])
+@cross_origin()
+def promote_to_premium():
+    data = request.get_json()
+    email = data.get("email")
 
+    if not email:
+        return jsonify({"error": "Email is required."}), 400
+
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        # Check if user exists and premium status
+        c.execute("SELECT is_premium FROM users WHERE email = ?", (email,))
+        result = c.fetchone()
+
+        if not result:
+            conn.close()
+            return jsonify({"error": "User not found."}), 404
+
+        if result[0] == 1:
+            conn.close()
+            return jsonify({"message": f"{email} is already a premium user."}), 200
+
+        # Promote to premium
+        c.execute("UPDATE users SET is_premium = 1 WHERE email = ?", (email,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": f"{email} promoted to premium."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+@app.route("/create-checkout-session", methods=["POST"])
+@cross_origin()
+def create_checkout_session():
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        if not email:
+            return jsonify({"error": "Email required"}), 400
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price": os.getenv("STRIPE_PRICE_ID"),
+                "quantity": 1,
+            }],
+            mode="payment",
+            customer_email=email,
+            success_url=os.getenv("BASE_URL") + "/premium-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=os.getenv("BASE_URL") + "/premium-cancelled",
+        )
+        return jsonify({"url": session.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/webhook", methods=["POST"])
+def stripe_webhook():
+    payload = request.data
+    sig_header = request.headers.get("stripe-signature")
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")  # you'll set this next
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        return jsonify(success=False, error="Invalid payload"), 400
+    except stripe.error.SignatureVerificationError as e:
+        return jsonify(success=False, error="Invalid signature"), 400
+
+    # Handle the event
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        email = session.get("customer_email")
+
+        if email:
+            # Promote the user to premium in your DB
+            db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("UPDATE users SET is_premium = 1 WHERE email = ?", (email,))
+            conn.commit()
+            conn.close()
+
+    return jsonify(success=True), 200
 
 
 @app.errorhandler(RequestEntityTooLarge)

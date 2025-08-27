@@ -19,6 +19,7 @@ export default function UploadForm() {
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
   const { user } = useContext(AuthContext);
+  const [isPremium, setIsPremium] = useState(false);
 
   // ✅ Usage state
   const [usedMB, setUsedMB] = useState(0);
@@ -33,6 +34,7 @@ export default function UploadForm() {
       });
       setUsedMB(res.data.used_mb);
       setLimitMB(res.data.limit_mb);
+      setIsPremium(res.data.is_premium); // 💎 NEW
     } catch (err) {
       console.error("Failed to fetch usage", err);
     }
@@ -207,6 +209,24 @@ export default function UploadForm() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      {/* 🌟 PREMIUM BADGE */}
+      {isPremium && (
+        <div className="w-full mb-6">
+          <div className="relative w-full bg-[#1f1f1f] border border-yellow-500 rounded-xl shadow-lg px-6 py-3 flex items-center justify-between overflow-hidden">
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse"></div>
+              <span className="text-yellow-300 font-semibold tracking-wide text-sm uppercase">
+                Premium Account
+              </span>
+            </div>
+            <span className="text-xs text-yellow-500 italic">
+              3GB Limit • Priority Queue • Clean Audio Previews
+            </span>
+            <div className="absolute inset-0 pointer-events-none opacity-5 bg-[url('/gold-texture.png')] bg-cover bg-center" />
+          </div>
+        </div>
+      )}
+ 
       {/* ✅ USAGE BAR */}
       <div className="mb-4">
         <p className="text-sm text-gray-200 mb-1">
