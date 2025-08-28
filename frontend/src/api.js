@@ -27,7 +27,6 @@ export async function uploadFile(file, selectedStems, onProgress, userEmail) {
   }
 }
 
-
 export function streamJob(jobId, onMessage) {
   const evtSource = new EventSource(`${API_BASE}/stream/${jobId}`);
   evtSource.onmessage = (e) => {
@@ -65,3 +64,14 @@ export async function downloadZip(jobId, onError) {
   }
 }
 
+// Stripe Checkout Session Creator
+export async function createCheckoutSession(email) {
+  try {
+    if (!email) throw new Error("You must be logged in to upgrade.");
+    const res = await axios.post(`${API_BASE}/create-checkout-session`, { email });
+    if (!res.data?.url) throw new Error("Failed to create checkout session.");
+    window.location.href = res.data.url; // redirect to Stripe Checkout
+  } catch (err) {
+    throw new Error(err.response?.data?.error || err.message || "Stripe checkout failed.");
+  }
+}

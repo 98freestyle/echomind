@@ -9,6 +9,7 @@ import Dashboard from "./components/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ResetPasswordRequest from "./components/ResetPasswordRequest";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
+import PremiumSuccess from "./components/PremiumSuccess";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPasswordRequest />} />
         <Route path="/reset-password-confirm/:token" element={<ResetPasswordConfirm />} />
+        <Route path="/premium-success" element={<PremiumSuccess />} />
         <Route
           path="/dashboard"
           element={

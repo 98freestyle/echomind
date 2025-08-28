@@ -3,7 +3,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
 import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets, stripe
-from flask import Flask, request, send_file, render_template, Response, jsonify, make_response, redirect
+from flask import Flask, request, send_file, render_template, Response, jsonify, make_response, redirect, send_from_directory
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
 from pydub.utils import mediainfo
@@ -224,7 +224,6 @@ def is_rate_limited(ip):
             return f"Too many jobs processing (limit: {MAX_JOBS_PER_IP})."
 
     return None
-
 
 @app.route("/upload", methods=["POST"])
 @cross_origin()
@@ -857,8 +856,8 @@ def create_checkout_session():
             }],
             mode="payment",
             customer_email=email,
-            success_url=os.getenv("BASE_URL") + "/premium-success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=os.getenv("BASE_URL") + "/premium-cancelled",
+            success_url = f"{os.getenv('FRONTEND_URL')}/premium-success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url = f"{os.getenv('FRONTEND_URL')}/premium-cancelled",
         )
         return jsonify({"url": session.url})
     except Exception as e:
