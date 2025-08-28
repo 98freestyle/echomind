@@ -9,20 +9,6 @@ Runs Demucs completely silent except for start and completion logs.
 import subprocess
 import os
 
-def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None, logger=None, model_name="htdemucs"):
-    """
-    Split an audio file into stems using Demucs silently.
-
-    Args:
-        input_path (str): Path to the audio file to split.
-        output_dir (str): Directory where separated stems are saved.
-        stem_type (str): Type of separation ('all' or '2stems').
-        job_id (str): Optional job ID for log prefixing.
-        logger (logging.Logger): Optional Flask logger.
-
-    Returns:
-        str: Path to the directory containing separated stems.
-    """
 def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None, logger=None):
     """
     Split an audio file into stems using Demucs silently.

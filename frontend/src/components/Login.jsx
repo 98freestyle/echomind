@@ -1,7 +1,7 @@
 import React, { useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext.jsx";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Login() {
     const [email, setEmail] = useState("");
@@ -12,6 +12,11 @@ export default function Login() {
 
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // ✅ detect ?verified=true
+    const searchParams = new URLSearchParams(location.search);
+    const emailVerified = searchParams.get("verified") === "true";
 
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -62,6 +67,13 @@ export default function Login() {
             >
                 <h2 className="text-2xl font-bold text-center">Login</h2>
 
+                {/* ✅ Show success banner if email verified */}
+                {emailVerified && (
+                    <div className="bg-green-600 p-2 rounded text-sm mb-2">
+                        ✅ Email verified. You may close this tab.
+                    </div>
+                )}
+
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
                 {success && <div className="bg-green-600 p-2 rounded text-sm">Logged in successfully! ✅</div>}
 
@@ -110,14 +122,14 @@ export default function Login() {
                             ))}
                             <style>
                                 {`
-                                  @keyframes wavePulse {
-                                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
-                                    50% { transform: scaleY(1); opacity: 1; }
-                                  }
-                                  .animate-pulse {
-                                    animation: wavePulse 1s ease-in-out infinite;
-                                  }
-                                `}
+                  @keyframes wavePulse {
+                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
+                    50% { transform: scaleY(1); opacity: 1; }
+                  }
+                  .animate-pulse {
+                    animation: wavePulse 1s ease-in-out infinite;
+                  }
+                `}
                             </style>
                         </div>
                     ) : "Login"}

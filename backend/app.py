@@ -21,7 +21,14 @@ from utils.email_utils import send_email
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",   # local dev
+    "http://127.0.0.1:5000",   # backend self
+    "https://echomind.cloud"   # your production domain
+]
+
+CORS(app, resources={r"/*": {"origins": ALLOWED_ORIGINS}}, supports_credentials=True)
+
 
 load_dotenv()
 def get_env_int(name, default):
@@ -40,7 +47,7 @@ LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # fallback 5 min
 BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 
@@ -396,20 +403,23 @@ def download(job_id):
 
 
 @app.route("/preview/<job_id>/<stem>")
-@cross_origin()
 def preview(job_id, stem):
     preview_dir = os.path.join(TEMP_DIR, job_id, "preview")
     if not os.path.exists(preview_dir):
         return jsonify({"error": "Preview not found or expired."}), 404
 
-    path = os.path.join(preview_dir, f"{stem}.mp3")
-    if stem == "other" and not os.path.exists(path):
-        fallback = os.path.join(preview_dir, "no_vocals.wav")
-        if os.path.exists(fallback):
-            path = fallback
+    mp3_path = os.path.join(preview_dir, f"{stem}.mp3")
+    if os.path.exists(mp3_path):
+        return send_file(mp3_path, mimetype="audio/mpeg")
 
-    if os.path.exists(path):
-        return send_file(path, mimetype="audio/mpeg")
+    wav_path = os.path.join(preview_dir, f"{stem}.wav")
+    # fallback: some pipelines write "no_vocals.wav" instead of "other.wav"
+    if stem == "other" and not os.path.exists(wav_path):
+        wav_path = os.path.join(preview_dir, "no_vocals.wav")
+
+    if os.path.exists(wav_path):
+        return send_file(wav_path, mimetype="audio/wav")
+
     return jsonify({"error": "Stem not found."}), 404
 
 
@@ -893,6 +903,30 @@ def stripe_webhook():
             conn.close()
 
     return jsonify(success=True), 200
+
+@app.route("/validate-session", methods=["POST"])
+def validate_session():
+    data = request.get_json() or {}
+    session_id = data.get("session_id")
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        email = session.get("customer_email")
+        if not email:
+            return jsonify({"error": "No email on session"}), 400
+
+        # Mark premium (safe to call even if webhook already did it)
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET is_premium = 1 WHERE email = ?", (email,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "email": email}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.errorhandler(RequestEntityTooLarge)

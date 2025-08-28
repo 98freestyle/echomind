@@ -11,30 +11,21 @@ export default function PremiumSuccess() {
 
     useEffect(() => {
         const sessionId = searchParams.get("session_id");
-        if (!sessionId) return;
+        if (!sessionId) {
+            setMessage("Missing session ID.");
+            setLoading(false);
+            return;
+        }
 
-        fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${import.meta.env.VITE_STRIPE_SECRET_KEY}`,
-            },
+        fetch("http://127.0.0.1:5000/validate-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId }),
         })
             .then(res => res.json())
-            .then(async session => {
-                const email = session.customer_email;
-                if (!email) {
-                    setMessage("Something went wrong — no email returned.");
-                    return;
-                }
-
-                const res = await fetch("http://127.0.0.1:5000/promote-to-premium", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email }),
-                });
-
-                const data = await res.json();
+            .then(data => {
                 if (data.success) {
+                    const { email } = data;
                     setUser({ email, is_premium: true });
                     localStorage.setItem("user", JSON.stringify({ email, is_premium: true }));
                     setMessage("🎉 Your account is now Premium!");

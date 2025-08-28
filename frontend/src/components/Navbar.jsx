@@ -3,6 +3,10 @@ import { AuthContext } from "../context/AuthContext.jsx";
 import { Link, useNavigate } from "react-router-dom";
 import { createCheckoutSession } from "../api";
 
+function toBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
+}
+
 export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
@@ -13,6 +17,10 @@ export default function Navbar() {
     logout();
     navigate("/login");
   };
+
+  const isPremium = toBool(user?.is_premium);
+  // SHOW if logged out OR logged in & NOT premium
+  const shouldShowUpgrade = !user || !isPremium;
 
   return (
     <>
@@ -27,14 +35,13 @@ export default function Navbar() {
           </nav>
 
           <div className="hidden md:flex justify-end items-center space-x-4">
-            {/* Upgrade button for all users EXCEPT premium */}
-            {(!user || !user.is_premium) && (
+            {shouldShowUpgrade && (
               <button
                 onClick={() => {
                   if (!user) {
-                    navigate("/signup");
+                    navigate("/signup"); // logged out -> go sign up
                   } else {
-                    setShowModal(true);
+                    setShowModal(true);  // logged in & not premium -> open modal
                   }
                 }}
                 className="px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 text-white font-semibold shadow hover:opacity-90 transition"
@@ -88,10 +95,12 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Premium Modal */}
-      {showModal && user && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setShowModal(false)}>
+      {/* Premium Modal — only for logged-in, non-premium users */}
+      {showModal && user && !isPremium && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setShowModal(false)}
+        >
           <div
             className="w-full max-w-md rounded-2xl bg-gray-900 text-white p-6 shadow-2xl ring-1 ring-white/10"
             onClick={(e) => e.stopPropagation()}
@@ -124,7 +133,13 @@ export default function Navbar() {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => createCheckoutSession(user.email)}
+                onClick={() => {
+                  if (!user?.email) {
+                    navigate("/signup");
+                  } else {
+                    createCheckoutSession(user.email);
+                  }
+                }}
                 className="flex-1 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 font-semibold hover:opacity-90 transition"
               >
                 Upgrade now
@@ -138,7 +153,7 @@ export default function Navbar() {
             </div>
 
             <p className="mt-3 text-xs text-gray-400">
-              You’ll be redirected to Stripe Checkout. Once you pay, your account will automatically be upgraded.
+              You'll be redirected to Stripe Checkout. Once you pay, your account will automatically be upgraded.
             </p>
           </div>
         </div>
