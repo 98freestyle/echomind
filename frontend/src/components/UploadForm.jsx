@@ -20,6 +20,7 @@ export default function UploadForm() {
   const [volumes, setVolumes] = useState({});
   const { user } = useContext(AuthContext);
   const [isPremium, setIsPremium] = useState(false);
+  const [isPlayingAll, setIsPlayingAll] = useState(false);
 
   // ✅ Usage state
   const [usedMB, setUsedMB] = useState(0);
@@ -340,17 +341,42 @@ export default function UploadForm() {
             Download Stems
           </button>
 
+
           {showPreview && (
             <div className="mt-6 bg-gray-900 p-4 rounded-lg">
-              <h3 className="text-white mb-2">Preview Stems</h3>
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="text-white text-xl font-semibold">Preview Stems</h3>
+                <button
+                  onClick={() => {
+                    const shouldPlay = !isPlayingAll;
+                    setIsPlayingAll(shouldPlay);
+                    stems.forEach((stem) => {
+                      const ws = waveRefs.current[stem];
+                      if (ws) {
+                        ws.seekTo(0);
+                        shouldPlay ? ws.play() : ws.pause();
+                      }
+                    });
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold text-white transition"
+                >
+                  {isPlayingAll ? "⏹ Stop All" : "▶️ Play All in Sync"}
+                </button>
+              </div>
+
+
               {stems.map((stem) => (
                 <div key={stem} className="mb-6 flex items-center space-x-3">
                   <div className="min-w-[60px] text-sm text-white font-medium capitalize">
                     {stem}
                   </div>
 
+
                   <button
-                    onClick={() => toggleStemPlay(stem)}
+                    onClick={() => {
+                      if (isPlayingAll) return;
+                      toggleStemPlay(stem);
+                    }}
                     className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full flex items-center justify-center"
                   >
                     <svg
@@ -367,10 +393,12 @@ export default function UploadForm() {
                     </svg>
                   </button>
 
+
                   <div
                     id={`waveform-${stem}`}
                     className="flex-1 bg-black rounded"
                   ></div>
+
 
                   <div
                     className="relative w-8 h-32 bg-gray-700 rounded-lg cursor-pointer flex flex-col justify-end items-center overflow-hidden"

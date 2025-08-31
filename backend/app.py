@@ -84,11 +84,16 @@ def log(job_id, msg):
 
 def startup_cleanup():
     logger.info("Running startup cleanup of TEMP_DIR...")
-    for item in os.listdir(TEMP_DIR):
-        path = os.path.join(TEMP_DIR, item)
+    now = time.time()
+    for job_id in os.listdir(TEMP_DIR):
+        path = os.path.join(TEMP_DIR, job_id)
         try:
             if os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
+                last_mod = os.path.getmtime(path)
+                age = now - last_mod
+                if age > 3600:
+                    shutil.rmtree(path, ignore_errors=True)
+                    logger.info(f"[BOOT CLEANUP] Removed old folder: {job_id}")
             else:
                 os.remove(path)
         except Exception as e:
@@ -562,7 +567,7 @@ def verify_email():
         conn.commit()
         conn.close()
 
-        return redirect(f"{BASE_URL}/login?verified=true")
+        return redirect(f"{FRONTEND_URL}/verified")
 
     except Exception as e:
         import traceback
@@ -927,6 +932,21 @@ def validate_session():
         return jsonify({"success": True, "email": email}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+def preview_cleanup_loop():
+    while True:
+        time.sleep(3600)  # Run every hour
+        try:
+            for job_id in os.listdir(TEMP_DIR):
+                preview_dir = os.path.join(TEMP_DIR, job_id, "preview")
+                if not os.path.exists(preview_dir):
+                    continue
+                age = time.time() - os.path.getmtime(preview_dir)
+                if age > 3600:  # 1 hour old
+                    shutil.rmtree(os.path.join(TEMP_DIR, job_id), ignore_errors=True)
+                    logger.info(f"[CLEANUP] Removed expired preview: {job_id}")
+        except Exception as e:
+            logger.error(f"[CLEANUP] Error during preview cleanup: {e}")
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -938,7 +958,10 @@ def handle_exception(e):
     logger.error(f"Unhandled error: {e}")
     return jsonify({"error": "Internal server error."}), 500
 
+
+
 startup_cleanup()
+threading.Thread(target=preview_cleanup_loop, daemon=True).start()
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")

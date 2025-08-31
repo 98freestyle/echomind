@@ -14,10 +14,6 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // ✅ detect ?verified=true
-    const searchParams = new URLSearchParams(location.search);
-    const emailVerified = searchParams.get("verified") === "true";
-
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     const handleSubmit = async (e) => {
@@ -66,13 +62,6 @@ export default function Login() {
                 className="bg-gray-800 p-8 rounded-lg w-full max-w-md space-y-4 shadow-lg"
             >
                 <h2 className="text-2xl font-bold text-center">Login</h2>
-
-                {/* ✅ Show success banner if email verified */}
-                {emailVerified && (
-                    <div className="bg-green-600 p-2 rounded text-sm mb-2">
-                        ✅ Email verified. You may close this tab.
-                    </div>
-                )}
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
                 {success && <div className="bg-green-600 p-2 rounded text-sm">Logged in successfully! ✅</div>}
