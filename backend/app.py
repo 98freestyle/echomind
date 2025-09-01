@@ -332,8 +332,8 @@ def upload():
         c = conn.cursor()
         upload_date = time.strftime("%Y-%m-%d")
         c.execute(
-            "INSERT INTO usage (user_id, ip, date, mb_used) VALUES (?, ?, ?, ?)",
-            (user_id, ip, upload_date, file_size_mb)
+            "INSERT INTO usage (user_id, ip, date, mb_used, filename, stems) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, ip, upload_date, file_size_mb, filename, ",".join(selected_stems))
         )
         conn.commit()
     except Exception as e:
@@ -354,9 +354,6 @@ def upload():
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
-
-
-
 
 @app.route("/stream/<job_id>")
 @cross_origin()
@@ -533,6 +530,41 @@ def login():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+    
+@app.route("/job-history", methods=["GET"])
+@cross_origin()
+def job_history():
+    email = request.headers.get("X-User-Email")
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE email = ?", (email,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    user_id = user["id"]
+    c.execute("""
+        SELECT date, filename, stems, mb_used
+        FROM usage
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 10
+    """, (user_id,))
+    rows = c.fetchall()
+    conn.close()
+
+    history = [{
+        "date": row["date"],
+        "filename": row["filename"],
+        "stems": row["stems"],
+        "size": row["mb_used"]
+    } for row in rows]
+
+    return jsonify(history)    
 
 @app.route("/verify-email", methods=["GET"])
 @cross_origin()
@@ -744,13 +776,13 @@ def get_account_weekly_usage(user_id):
         """, (user_id, start_of_week_str))
 
         used = c.fetchone()[0] or 0
-        limit = 3000 if is_premium else 500
+        limit = 3000 if is_premium else 300
 
         return used, limit
 
     except Exception as e:
         print("Failed to fetch account usage:", e)
-        return 0, 500  # fallback
+        return 0, 300  # fallback
 
     finally:
         if conn:
@@ -795,7 +827,7 @@ def usage():
             result = c.fetchone()
             if result:
                 user_id, is_premium = result
-                limit = 3000 if is_premium else 500
+                limit = 3000 if is_premium else 300
 
                 c.execute("""
                     SELECT SUM(mb_used) FROM usage
@@ -804,7 +836,7 @@ def usage():
                 used = c.fetchone()[0] or 0
             else:
                 used = 0
-                limit = 500  # fallback
+                limit = 300  # fallback
 
         return jsonify({
             "used_mb": round(used, 2),

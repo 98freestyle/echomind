@@ -32,7 +32,7 @@ export default function Faq() {
         },
         {
             q: "What are the weekly usage caps?",
-            a: "Guests get 150MB/week, verified users get 500MB/week, and Premium accounts get 3GB/week. Usage resets every Monday at 12:00 AM AEST.",
+            a: "Guests get 150MB/week, verified users get 300MB/week, and Premium accounts get 3GB/week. Usage resets every Monday at 12:00 AM AEST.",
         },
         {
             q: "Do you store my audio?",

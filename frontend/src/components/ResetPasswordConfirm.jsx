@@ -34,7 +34,7 @@ export default function ResetPasswordConfirm() {
             });
 
             if (res.data.success) {
-                setMessage("Password reset successfully!");
+                setMessage("✅ Password reset successfully!");
                 setTimeout(() => navigate("/login"), 2000);
             } else {
                 setError("Invalid or expired token.");
@@ -47,9 +47,12 @@ export default function ResetPasswordConfirm() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-black text-white px-4">
-            <form onSubmit={handleSubmit} className="bg-gray-800 p-8 rounded-lg w-full max-w-md space-y-4 shadow-lg">
-                <h2 className="text-2xl font-bold text-center">Set New Password</h2>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black text-white px-4">
+            <form
+                onSubmit={handleSubmit}
+                className="bg-gray-800/80 backdrop-blur-md border border-gray-700 p-8 rounded-2xl w-full max-w-md space-y-4 shadow-xl"
+            >
+                <h2 className="text-2xl font-bold text-center">Set a New Password</h2>
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
                 {message && <div className="bg-green-600 p-2 rounded text-sm">{message}</div>}

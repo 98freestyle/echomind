@@ -50,6 +50,7 @@ export default function Signup() {
                 setSuccess(true);
                 setEmail("");
                 setPassword("");
+                setConfirmPassword("");
             } else {
                 setError("Unexpected response from server.");
             }
