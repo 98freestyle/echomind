@@ -24,7 +24,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-50 bg-transparent">
+      <header className="fixed top-0 left-0 w-full z-50 bg-gray-900/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-4 grid grid-cols-3 items-center">
           <Link to="/" className="text-white text-2xl font-bold">EchoMind</Link>
 

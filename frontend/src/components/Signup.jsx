@@ -50,11 +50,6 @@ export default function Signup() {
                 setSuccess(true);
                 setEmail("");
                 setPassword("");
-
-                // 🔁 Optional: redirect after a short delay
-                setTimeout(() => {
-                    navigate("/login");
-                }, 1500);
             } else {
                 setError("Unexpected response from server.");
             }
@@ -67,7 +62,7 @@ export default function Signup() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-black text-white px-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black text-white px-4">
             <form
                 onSubmit={handleSubmit}
                 className="bg-gray-800 p-8 rounded-lg w-full max-w-md space-y-4 shadow-lg"
@@ -75,7 +70,12 @@ export default function Signup() {
                 <h2 className="text-2xl font-bold text-center">Sign Up</h2>
 
                 {error && <div className="bg-red-600 p-2 rounded text-sm">{error}</div>}
-                {success && <div className="bg-green-600 p-2 rounded text-sm">Signup successful! 🎉</div>}
+                {success && (
+                    <div className="bg-green-700 bg-opacity-90 p-4 rounded-lg text-sm shadow-lg text-white space-y-1 border border-green-500">
+                        <div className="text-lg font-semibold">✅ You're almost there!</div>
+                        <p>Check your inbox and verify your email to start using EchoMind.</p>
+                    </div>
+                )}
 
                 <input
                     type="email"
