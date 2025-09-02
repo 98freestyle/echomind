@@ -1003,6 +1003,10 @@ def serve_react(path):
         return send_from_directory("../frontend/dist", path)
     else:
         return send_from_directory("../frontend/dist", "index.html")
+    
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"ok": True}), 200
 
 
 if __name__ == "__main__":
