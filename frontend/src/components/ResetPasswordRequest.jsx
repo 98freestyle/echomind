@@ -14,7 +14,7 @@ export default function ResetPasswordRequest() {
         setLoading(true);
 
         try {
-            const res = await axios.post("http://127.0.0.1:5000/reset-password-request", { email });
+            const res = await axios.post(`${import.meta.env.VITE_BASE_URL}/reset-password-request`, { email });
 
             if (res.data.success) {
                 setMessage("✅ Password reset link sent to your email.");

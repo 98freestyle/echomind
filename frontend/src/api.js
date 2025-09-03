@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://127.0.0.1:5000"; // Flask dev server URL
+const API_BASE = import.meta.env.VITE_BASE_URL; // Flask dev server URL
 
 export async function uploadFile(file, selectedStems, onProgress, userEmail) {
   try {

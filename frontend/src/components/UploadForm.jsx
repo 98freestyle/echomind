@@ -28,7 +28,7 @@ export default function UploadForm() {
 
   const fetchUsage = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/usage", {
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/usage`, {
         headers: {
           ...(user?.email && { "X-User-Email": user.email })
         }
@@ -153,7 +153,7 @@ export default function UploadForm() {
   useEffect(() => {
     if (done && showPreview && jobId) {
       stems.forEach((stem) => {
-        const url = `http://127.0.0.1:5000/preview/${jobId}/${stem}`;
+        const url = `${import.meta.env.VITE_BASE_URL}/preview/${jobId}/${stem}`;
         createWaveform(url, stem);
       });
     }

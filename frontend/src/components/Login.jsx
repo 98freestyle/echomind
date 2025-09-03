@@ -39,7 +39,8 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const res = await axios.post("http://127.0.0.1:5000/login", { email, password });
+            const res = await axios.post(`${import.meta.env.VITE_BASE_URL}/login`, { email, password });
+
 
             if (res.data.success) {
                 login(email);

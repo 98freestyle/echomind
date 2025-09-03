@@ -29,7 +29,8 @@ export default function ResetPasswordConfirm() {
         setLoading(true);
 
         try {
-            const res = await axios.post(`http://127.0.0.1:5000/reset-password-confirm/${token}`, {
+            const res = await axios.post(`${import.meta.env.VITE_BASE_URL}/reset-password-confirm/${token}`, {
+
                 new_password: newPassword
             });
 

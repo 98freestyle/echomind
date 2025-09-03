@@ -9,7 +9,7 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (!user?.email) return;
-        axios.get("http://127.0.0.1:5000/job-history", {
+        axios.get(`${import.meta.env.VITE_BASE_URL}/job-history`, {
             headers: {
                 "X-User-Email": user.email
             }
