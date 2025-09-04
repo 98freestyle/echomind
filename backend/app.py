@@ -521,8 +521,8 @@ def login():
         if not check_password_hash(stored_pw, password):
             return jsonify({"error": "Invalid credentials."}), 401
 
-        if not is_verified:
-            return jsonify({"error": "Please verify your email before logging in."}), 403
+        #if not is_verified:
+        #    return jsonify({"error": "Please verify your email before logging in."}), 403
 
         return jsonify({"success": True}), 200
 
@@ -999,10 +999,13 @@ threading.Thread(target=preview_cleanup_loop, daemon=True).start()
 @app.route("/<path:path>")
 def serve_react(path):
     from flask import send_from_directory
-    if path != "" and os.path.exists(f"../frontend/dist/{path}"):
-        return send_from_directory("../frontend/dist", path)
+    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+    if path != "" and os.path.exists(os.path.join(base_path, path)):
+        return send_from_directory(base_path, path)
     else:
-        return send_from_directory("../frontend/dist", "index.html")
+        return send_from_directory(base_path, "index.html")
+
+
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only if using HTTPS
