@@ -21,13 +21,13 @@ from utils.email_utils import send_email
 
 
 app = Flask(__name__)
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",   # local dev
-    "http://127.0.0.1:5000",   # backend self
-    "https://echomind.cloud"   # your production domain
-]
 
-CORS(app, resources={r"/*": {"origins": ALLOWED_ORIGINS}}, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=[
+    "http://localhost:5173",
+    "http://127.0.0.1:5000",
+    "http://154.26.159.203:5000",
+    "https://echomind.cloud"
+])
 
 
 load_dotenv()
@@ -1004,6 +1004,8 @@ def serve_react(path):
     else:
         return send_from_directory("../frontend/dist", "index.html")
 
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only if using HTTPS
 
-if __name__ == "__main__":
-    app.run(debug=True, threaded=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
