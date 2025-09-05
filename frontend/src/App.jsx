@@ -11,6 +11,7 @@ import ResetPasswordRequest from "./components/ResetPasswordRequest";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import PremiumSuccess from "./components/PremiumSuccess";
 import VerifiedEmail from "./components/VerifiedEmail";
+import Contact from "./components/Contact";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/reset-password-confirm/:token" element={<ResetPasswordConfirm />} />
         <Route path="/premium-success" element={<PremiumSuccess />} />
         <Route path="/verified" element={<VerifiedEmail />} />
+        <Route path="/contact" element={<Contact />} />
         <Route
           path="/dashboard"
           element={

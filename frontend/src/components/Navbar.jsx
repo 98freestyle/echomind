@@ -31,6 +31,7 @@ export default function Navbar() {
           <nav className="hidden md:flex justify-center space-x-6 text-white">
             <Link to="/" className="hover:text-gray-300">Home</Link>
             <Link to="/faq" className="hover:text-gray-300">FAQ</Link>
+            <Link to="/contact" className="...">Contact</Link>
             {user && <Link to="/dashboard" className="hover:text-gray-300">Dashboard</Link>}
           </nav>
 
@@ -112,13 +113,13 @@ export default function Navbar() {
 
             <div className="mt-4 space-y-3">
               <div className="rounded-lg bg-gray-800 p-4">
-                <div className="text-2xl font-extrabold">AUD $19</div>
+                <div className="text-2xl font-extrabold">AUD $15</div>
                 <div className="text-sm text-gray-300">one-time payment</div>
               </div>
               <ul className="text-sm space-y-2">
                 <li className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-500"></span>
-                  Unlock <span className="font-semibold">3GB/week</span> processing quota
+                  Unlock 2GB/week processing quota
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>

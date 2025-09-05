@@ -1,6 +1,7 @@
 import React, { useEffect, useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext.jsx";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import confetti from "canvas-confetti";
 
 export default function PremiumSuccess() {
     const { setUser } = useContext(AuthContext);
@@ -22,13 +23,20 @@ export default function PremiumSuccess() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ session_id: sessionId }),
         })
-            .then(res => res.json())
-            .then(data => {
+            .then((res) => res.json())
+            .then((data) => {
                 if (data.success) {
                     const { email } = data;
                     setUser({ email, is_premium: true });
                     localStorage.setItem("user", JSON.stringify({ email, is_premium: true }));
                     setMessage("🎉 Your account is now Premium!");
+
+                    // Trigger confetti once on success
+                    confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                    });
                 } else {
                     setMessage(data.error || "Something went wrong.");
                 }
@@ -40,27 +48,19 @@ export default function PremiumSuccess() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-black to-zinc-800 text-white flex flex-col justify-center items-center px-6">
-            <div className="bg-white/5 backdrop-blur-md p-8 rounded-2xl shadow-2xl border border-white/10 max-w-xl w-full text-center animate-fade-in">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black text-white px-4">
+            <div className="text-center">
                 {loading ? (
-                    <p className="text-lg text-gray-300">Upgrading your account...</p>
+                    <p className="text-lg">Upgrading your account...</p>
                 ) : (
-                    <>
-                        <div className="text-6xl mb-4">💎</div>
-                        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">
-                            {message}
-                        </h1>
-                        <p className="text-gray-400 mb-6">
-                            You now have faster processing, more upload space, and priority access.
-                        </p>
-                        <button
-                            onClick={() => navigate("/dashboard")}
-                            className="px-5 py-3 rounded-xl bg-yellow-500 text-black font-semibold hover:bg-yellow-400 transition"
-                        >
-                            Go to Dashboard
-                        </button>
-                    </>
+                    <p className="text-lg animate-fade-in font-bold text-xl">{message}</p>
                 )}
+                <button
+                    onClick={() => navigate("/dashboard")}
+                    className="mt-4 px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition"
+                >
+                    Go to Dashboard
+                </button>
             </div>
         </div>
     );
