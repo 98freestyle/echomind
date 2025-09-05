@@ -2,7 +2,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets, stripe
+import os, shutil, uuid, time, threading, subprocess, queue, logging, mimetypes, sqlite3, bcrypt, secrets, stripe, pytz
 from flask import Flask, request, send_file, render_template, Response, jsonify, make_response, redirect, send_from_directory
 from flask_cors import CORS, cross_origin
 from pydub import AudioSegment
@@ -18,16 +18,13 @@ from datetime import datetime, timedelta
 from disposable_email_domains import blocklist
 from datetime import datetime, timedelta
 from utils.email_utils import send_email
+from zoneinfo import ZoneInfo
 
 
 app = Flask(__name__)
-
-CORS(app, supports_credentials=True, origins=[
-    "http://localhost:5173",
-    "http://127.0.0.1:5000",
-    "http://154.26.159.203:5000",
-    "https://echomind.cloud"
-])
+aest = datetime.now(pytz.timezone("Australia/Sydney")).date()
+cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
+CORS(app, supports_credentials=True, origins=cors_origins)
 
 
 load_dotenv()
@@ -77,25 +74,22 @@ def get_db_connection():
     return conn
 
 def get_client_ip():
-    # Cloudflare header first
-    cf = request.headers.get("CF-Connecting-IP")
-    if cf:
-        return cf.strip()
+    try:
+        cf = request.headers.get("CF-Connecting-IP")
+        if cf:
+            return cf.strip()
 
-    # Standard reverse proxy header (may be a chain: client, proxy1, proxy2)
-    xff = request.headers.get("X-Forwarded-For")
-    if xff:
-        client = xff.split(",")[0].strip()
-        return client
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            return xff.split(",")[0].strip()
 
-    # Nginx / some proxies
-    xri = request.headers.get("X-Real-IP")
-    if xri:
-        return xri.strip()
+        xri = request.headers.get("X-Real-IP")
+        if xri:
+            return xri.strip()
+    except Exception as e:
+        print("Failed to read IP headers:", e)
 
-    # Fallback
-    ip = request.remote_addr or ""
-    # Normalize IPv6-mapped IPv4 (::ffff:1.2.3.4 -> 1.2.3.4)
+    ip = request.environ.get("REMOTE_ADDR", "")
     if ip.startswith("::ffff:"):
         ip = ip.split("::ffff:")[-1]
     return ip
@@ -267,10 +261,6 @@ def is_rate_limited(ip):
 @cross_origin()
 def upload():
     cleanup_old_temp()
-    ip = get_client_ip()
-    rate_limit_msg = is_rate_limited(ip)
-    if rate_limit_msg:
-        return jsonify({"error": rate_limit_msg}), 429
 
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded."}), 400
@@ -279,6 +269,13 @@ def upload():
     filename = secure_filename(file.filename)
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Unsupported file type."}), 400
+
+    # ✅ Only now is it safe to access headers
+    ip = get_client_ip()
+    print(f"👀 Client IP: {ip}")
+    rate_limit_msg = is_rate_limited(ip)
+    if rate_limit_msg:
+        return jsonify({"error": rate_limit_msg}), 429
 
     # 👇 Calculate file size
     file.seek(0, os.SEEK_END)
@@ -381,6 +378,7 @@ def upload():
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
 
+
 @app.route("/stream/<job_id>")
 @cross_origin()
 def stream(job_id):
@@ -470,7 +468,7 @@ def signup():
     c = conn.cursor()
 
     # Check if IP has signed up in last 7 days // COMMENTING OUT JUST FOR TESTING LOCALLY 
-    #ip = get_client_ip()
+    ip = get_client_ip()
     #c.execute('''
     #    SELECT * FROM signup_attempts
     #    WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
@@ -764,7 +762,12 @@ def get_guest_weekly_usage(ip):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        # For zoneinfo
+        now = datetime.now(ZoneInfo("Australia/Sydney"))
+        # OR for pytz
+        # now = datetime.now(pytz.timezone("Australia/Sydney"))
+
+        start_of_week = now.date() - timedelta(days=now.weekday())
         start_of_week_str = start_of_week.isoformat()
 
         c.execute("""
@@ -787,7 +790,12 @@ def get_account_weekly_usage(user_id):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        # For zoneinfo
+        now = datetime.now(ZoneInfo("Australia/Sydney"))
+        # OR for pytz
+        # now = datetime.now(pytz.timezone("Australia/Sydney"))
+
+        start_of_week = now.date() - timedelta(days=now.weekday())
         start_of_week_str = start_of_week.isoformat()
 
         # Fetch is_premium
@@ -1053,7 +1061,9 @@ def handle_exception(e):
     logger.error(f"Unhandled error: {e}")
     return jsonify({"error": "Internal server error."}), 500
 
-
+@app.errorhandler(413)
+def handle_413(e):
+    return jsonify({"error": "File too large. Max allowed is 200MB."}), 413
 
 startup_cleanup()
 threading.Thread(target=preview_cleanup_loop, daemon=True).start()
@@ -1075,3 +1085,4 @@ app.config['SESSION_COOKIE_SECURE'] = os.getenv("COOKIE_SECURE", "true").lower()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+    
