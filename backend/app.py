@@ -67,12 +67,38 @@ active_processing = set()
 active_downloading = set()
 jobs_lock = threading.Lock()
 
+
+
 def get_db_connection():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(BASE_DIR, "db", "users.db")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+def get_client_ip():
+    # Cloudflare header first
+    cf = request.headers.get("CF-Connecting-IP")
+    if cf:
+        return cf.strip()
+
+    # Standard reverse proxy header (may be a chain: client, proxy1, proxy2)
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        client = xff.split(",")[0].strip()
+        return client
+
+    # Nginx / some proxies
+    xri = request.headers.get("X-Real-IP")
+    if xri:
+        return xri.strip()
+
+    # Fallback
+    ip = request.remote_addr or ""
+    # Normalize IPv6-mapped IPv4 (::ffff:1.2.3.4 -> 1.2.3.4)
+    if ip.startswith("::ffff:"):
+        ip = ip.split("::ffff:")[-1]
+    return ip
 
 def allowed_file(filename):
     return filename and Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
@@ -211,7 +237,7 @@ def process_job(job_id, upload_path, filename, selected_stems):
 def is_rate_limited(ip):
     now = time.time()
     window = 60
-    max_uploads = 2  # Your .env value
+    max_uploads = MAX_UPLOADS_PER_MIN
 
     with jobs_lock:
         history = UPLOAD_HISTORY[ip]
@@ -241,7 +267,7 @@ def is_rate_limited(ip):
 @cross_origin()
 def upload():
     cleanup_old_temp()
-    ip = request.remote_addr
+    ip = get_client_ip()
     rate_limit_msg = is_rate_limited(ip)
     if rate_limit_msg:
         return jsonify({"error": rate_limit_msg}), 429
@@ -444,7 +470,7 @@ def signup():
     c = conn.cursor()
 
     # Check if IP has signed up in last 7 days // COMMENTING OUT JUST FOR TESTING LOCALLY 
-    ip = request.remote_addr
+    #ip = get_client_ip()
     #c.execute('''
     #    SELECT * FROM signup_attempts
     #    WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
@@ -776,7 +802,7 @@ def get_account_weekly_usage(user_id):
         """, (user_id, start_of_week_str))
 
         used = c.fetchone()[0] or 0
-        limit = 3000 if is_premium else 300
+        limit = 2000 if is_premium else 300
 
         return used, limit
 
@@ -793,7 +819,7 @@ def get_account_weekly_usage(user_id):
 @app.route("/usage", methods=["GET"])
 @cross_origin()
 def usage():
-    ip = request.remote_addr
+    ip = get_client_ip()
     email = request.headers.get("X-User-Email")
     is_guest = True
     user_id = None
@@ -827,7 +853,7 @@ def usage():
             result = c.fetchone()
             if result:
                 user_id, is_premium = result
-                limit = 3000 if is_premium else 300
+                limit = 2000 if is_premium else 300
 
                 c.execute("""
                     SELECT SUM(mb_used) FROM usage
@@ -910,28 +936,50 @@ def create_checkout_session():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/support-request", methods=["POST"])
+def support_request():
+    data = request.get_json()
+    name = data.get("name")
+    email = data.get("email")
+    message = data.get("message")
+
+    if not name or not email or not message:
+        return jsonify(success=False, error="All fields are required."), 400
+
+    html_body = f"""
+    <h3>📩 New Support Request</h3>
+    <p><strong>From:</strong> {name} ({email})</p>
+    <p><strong>Message:</strong></p>
+    <p>{message}</p>
+    """
+
+    try:
+        send_email("support@echomind.cloud", f"Support Request from {name}", html_body)
+        return jsonify(success=True), 200
+    except Exception as e:
+        print("❌ Failed to send support email:", e)
+        return jsonify(success=False, error="Email sending failed."), 500
+
+
 @app.route("/webhook", methods=["POST"])
 def stripe_webhook():
     payload = request.data
     sig_header = request.headers.get("stripe-signature")
-    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")  # you'll set this next
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
-    except ValueError as e:
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+    except ValueError:
         return jsonify(success=False, error="Invalid payload"), 400
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         return jsonify(success=False, error="Invalid signature"), 400
 
-    # Handle the event
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         email = session.get("customer_email")
 
         if email:
-            # Promote the user to premium in your DB
+            # Promote user to premium
             db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
             conn = sqlite3.connect(db_path)
             c = conn.cursor()
@@ -939,7 +987,22 @@ def stripe_webhook():
             conn.commit()
             conn.close()
 
+            # Send premium email using same utility
+            html_body = f"""
+            <h3>Welcome to EchoMind Premium ✨</h3>
+            <p>Hi {email},</p>
+            <p>Your premium upgrade was successful. You now have access to:</p>
+            <ul>
+              <li>🔓 Higher upload limits</li>
+              <li>⚡ Faster splitting</li>
+              <li>🚀 Priority feature access</li>
+            </ul>
+            <p>Enjoy and thank you for supporting EchoMind.</p>
+            """
+            send_email(email, "You're now Premium on EchoMind", html_body)
+
     return jsonify(success=True), 200
+
 
 @app.route("/validate-session", methods=["POST"])
 def validate_session():
@@ -1008,7 +1071,7 @@ def serve_react(path):
 
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only if using HTTPS
+app.config['SESSION_COOKIE_SECURE'] = os.getenv("COOKIE_SECURE", "true").lower() == "true"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
