@@ -395,26 +395,34 @@ def stream(job_id):
                 break
     return Response(event_stream(), mimetype="text/event-stream")
 
-@app.route("/download/<job_id>")
+@app.route("/download-link/<job_id>")
 @cross_origin()
-def download(job_id):
+def download_link(job_id):
     job = JOBS.get(job_id)
-    zip_path = job["zip"] if job else None
+    if not job or not job.get("zip") or not os.path.exists(job["zip"]):
+        return jsonify({"error": "Download not ready or expired."}), 410
+    
+    zip_filename = os.path.basename(job["zip"])
+    return jsonify({
+        "url": f"/download-direct/{job_id}/{zip_filename}"
+    })
 
-    if not job or not zip_path or not os.path.exists(zip_path):
-        return jsonify({"error": "Download link expired. Please re-upload your file."}), 410
+@app.route("/download-direct/<job_id>/<filename>")
+@cross_origin()
+def download_direct(job_id, filename):
+    job = JOBS.pop(job_id, None)
+    if not job:
+        return jsonify({"error": "Job not found."}), 404
 
-    temp_zip_path = zip_path + ".tmp"
-    shutil.move(zip_path, temp_zip_path)
-    folder_to_delete = os.path.dirname(temp_zip_path)
+    path = os.path.join(TEMP_DIR, job_id, filename)
+    if not os.path.exists(path):
+        return jsonify({"error": "File missing."}), 410
+
+    folder_to_delete = os.path.dirname(path)
     active_downloading.add(job_id)
 
-    with jobs_lock:
-        JOBS.pop(job_id, None)
-
-    filename = os.path.basename(zip_path)
-    response = make_response(send_file(temp_zip_path, as_attachment=True))
-    response.headers["Content-Type"] = mimetypes.guess_type(temp_zip_path)[0] or "application/octet-stream"
+    response = make_response(send_file(path, as_attachment=True))
+    response.headers["Content-Type"] = mimetypes.guess_type(path)[0] or "application/zip"
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
     response.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
 
@@ -426,6 +434,7 @@ def download(job_id):
 
     threading.Thread(target=cleanup_job).start()
     return response
+
 
 
 @app.route("/preview/<job_id>/<stem>")
