@@ -34,7 +34,7 @@ def get_env_int(name, default):
     except:
         return default
     
-MAX_CONTENT_LENGTH_MB = int(os.getenv("MAX_CONTENT_LENGTH", 100))
+MAX_CONTENT_LENGTH_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", 100))
 MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH_MB * 1024 * 1024
 MAX_DISK_USAGE_MB = int(os.getenv("MAX_DISK_USAGE_MB", 1000))
 MAX_JOBS_PER_IP = int(os.getenv("MAX_JOBS_PER_IP", 2))

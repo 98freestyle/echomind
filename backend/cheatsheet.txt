@@ -1,0 +1,11 @@
+🚀 EchoMind Server Cheatsheet
+
+Backend (Gunicorn / Flask)
+
+Start: sudo systemctl start echomind
+
+Stop: sudo systemctl stop echomind
+
+Restart (apply changes): sudo systemctl restart echomind
+
+Status: sudo systemctl status echomind
