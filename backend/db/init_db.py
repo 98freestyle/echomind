@@ -64,5 +64,17 @@ c.execute('''
     )
 ''')
 
+# Jobs table
+c.execute('''
+    CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        ip TEXT,
+        status TEXT,
+        zip_path TEXT,
+        priority INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+''')
+
 conn.commit()
 conn.close()

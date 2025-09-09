@@ -58,11 +58,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(m
                     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()])
 logger = logging.getLogger(__name__)
 
-JOBS = {}
 UPLOAD_HISTORY = defaultdict(lambda: deque())
 active_processing = set()
 active_downloading = set()
-jobs_lock = threading.Lock()
+upload_history_lock = threading.Lock()
 
 
 
@@ -99,8 +98,6 @@ def allowed_file(filename):
 
 def log(job_id, msg):
     logger.info(f"[{job_id}] {msg}")
-    if job_id in JOBS:
-        JOBS[job_id]["events"].put(msg)
 
 def startup_cleanup():
     logger.info("Running startup cleanup of TEMP_DIR...")
@@ -166,10 +163,9 @@ def process_job(job_id, upload_path, filename, selected_stems):
 
         all_possible_stems = {"vocals", "drums", "bass", "other", "no_vocals"}
         for stem in all_possible_stems:
-            if stem == "no_vocals":
-                if "other" in selected_stems:
-                    continue
-            elif stem not in selected_stems:
+            if stem == "no_vocals" and "other" in selected_stems:
+                continue
+            if stem not in selected_stems:
                 file_path = os.path.join(track_dir, f"{stem}.wav")
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -184,47 +180,66 @@ def process_job(job_id, upload_path, filename, selected_stems):
                 dst_preview = os.path.join(preview_dir, f"{stem}.mp3")
                 audio = AudioSegment.from_wav(src)
                 export_opts = {"format": "mp3", "bitrate": "192k"}
-                if len(audio) > 30_000:
-                    audio[:30_000].export(dst_preview, **export_opts)
-                else:
-                    audio.export(dst_preview, **export_opts)
+                (audio[:30_000] if len(audio) > 30_000 else audio).export(dst_preview, **export_opts)
 
         shutil.make_archive(zip_output_path.replace(".zip", ""), 'zip', track_dir)
 
         try:
             os.remove(upload_path)
-        except Exception:
+        except:
             pass
         shutil.rmtree(demucs_dir, ignore_errors=True)
 
-        with jobs_lock:
-            JOBS[job_id]["status"] = "done"
-            JOBS[job_id]["zip"] = zip_output_path
+        # ✅ Update job in DB
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE jobs SET status = ?, zip_path = ? WHERE id = ?", ("done", zip_output_path, job_id))
+            conn.commit()
+        except Exception as e:
+            log(job_id, f"❌ Failed to update job status: {e}")
+        finally:
+            if conn:
+                conn.close()
 
         duration = time.time() - start_time
         log(job_id, f"Processing time: {duration:.2f} seconds")
         log(job_id, "Job complete. ZIP ready.")
-        JOBS[job_id]["events"].put("Job complete")
 
+        # ✅ Cleanup after expiration
         def auto_cleanup():
             time.sleep(JOB_EXPIRATION)
-            with jobs_lock:
-                if job_id in JOBS and JOBS[job_id]["status"] == "done":
-                    folder = os.path.join(TEMP_DIR, job_id)
-                    shutil.rmtree(folder, ignore_errors=True)
-                    JOBS.pop(job_id, None)
-                    logger.info(f"[CLEANUP] Auto-deleted job {job_id}")
+            folder = os.path.join(TEMP_DIR, job_id)
+            shutil.rmtree(folder, ignore_errors=True)
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                conn.commit()
+                logger.info(f"[CLEANUP] Auto-deleted job {job_id}")
+            except Exception as e:
+                logger.error(f"[CLEANUP ERROR] Could not delete job {job_id}: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
         threading.Thread(target=auto_cleanup, daemon=True).start()
 
     except Exception as e:
-        with jobs_lock:
-            if job_id in JOBS:
-                JOBS[job_id]["status"] = "error"
-                JOBS[job_id]["zip"] = None
-        log(job_id, f"Error: {e}")
+        log(job_id, f"❌ Error during processing: {e}")
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE jobs SET status = ?, zip_path = NULL WHERE id = ?", ("error", job_id))
+            conn.commit()
+        except:
+            pass
+        finally:
+            if conn:
+                conn.close()
     finally:
         active_processing.discard(job_id)
+
 
 
 
@@ -233,29 +248,34 @@ def is_rate_limited(ip):
     window = 60
     max_uploads = MAX_UPLOADS_PER_MIN
 
-    with jobs_lock:
+    with upload_history_lock:
         history = UPLOAD_HISTORY[ip]
 
-        # Remove expired timestamps
         while history and now - history[0] > window:
             history.popleft()
 
-        # ✅ BLOCK if over frequency limit
         if len(history) >= max_uploads:
             return f"Upload rate limit exceeded ({max_uploads} per {window}s)."
 
-        # ✅ Count this attempt no matter what
         history.append(now)
 
-        # ✅ Then check active jobs
-        active_jobs = sum(
-            1 for job in JOBS.values()
-            if job.get("ip") == ip and job.get("status") == "processing"
-        )
+    # ✅ Now check DB for active jobs
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM jobs WHERE ip = ? AND status = 'processing'", (ip,))
+        active_jobs = c.fetchone()[0]
+        conn.close()
+
         if active_jobs >= MAX_JOBS_PER_IP:
             return f"Too many jobs processing (limit: {MAX_JOBS_PER_IP})."
 
+    except Exception as e:
+        logger.error(f"Rate limit DB check failed: {e}")
+        return None
+
     return None
+
 
 @app.route("/upload", methods=["POST"])
 @cross_origin()
@@ -270,19 +290,16 @@ def upload():
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Unsupported file type."}), 400
 
-    # ✅ Only now is it safe to access headers
     ip = get_client_ip()
     print(f"👀 Client IP: {ip}")
     rate_limit_msg = is_rate_limited(ip)
     if rate_limit_msg:
         return jsonify({"error": rate_limit_msg}), 429
 
-    # 👇 Calculate file size
     file.seek(0, os.SEEK_END)
     file_size_mb = round(file.tell() / (1024 * 1024), 2)
     file.seek(0)
 
-    # 👇 Check account status
     email = request.headers.get("X-User-Email")
     user_id = None
     is_guest = True
@@ -305,7 +322,6 @@ def upload():
             if conn:
                 conn.close()
 
-    # 👇 Usage check
     if is_guest:
         weekly_usage = get_guest_weekly_usage(ip)
         cap = 150
@@ -349,7 +365,6 @@ def upload():
         upload_path = wav_path
         log(job_id, "Extracted audio from MP4.")
 
-    # 👇 Log usage to DB
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
@@ -365,97 +380,170 @@ def upload():
         if conn:
             conn.close()
 
-    # ✅ Register job with priority flag
-    with jobs_lock:
-        JOBS[job_id] = {
-            "status": "processing",
-            "zip": None,
-            "events": queue.Queue(),
-            "ip": ip,
-            "priority": is_premium
-        }
+    # ✅ Insert job into DB
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO jobs (id, ip, status, zip_path, priority)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (job_id, ip, 'processing', None, int(is_premium)))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to insert job into DB: {e}")
+    finally:
+        if conn:
+            conn.close()
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 
 @app.route("/stream/<job_id>")
 @cross_origin()
 def stream(job_id):
     def event_stream():
-        q = JOBS.get(job_id, {}).get("events")
-        if not q:
-            yield "data: Job not found\n\n"
-            return
         yield "data: Processing started...\n\n"
         while True:
-            msg = q.get()
-            yield f"data: {msg}\n\n"
-            if "Job complete" in msg or "Error" in msg:
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("SELECT status FROM jobs WHERE id = ?", (job_id,))
+                result = c.fetchone()
+                conn.close()
+                if not result:
+                    yield "data: Job not found\n\n"
+                    break
+                status = result["status"]
+                if status == "done":
+                    yield "data: Job complete\n\n"
+                    break
+                elif status == "error":
+                    yield "data: Error\n\n"
+                    break
+                else:
+                    time.sleep(2)
+            except Exception as e:
+                yield f"data: Error: {str(e)}\n\n"
                 break
+
     return Response(event_stream(), mimetype="text/event-stream")
+
 
 @app.route("/download-link/<job_id>")
 @cross_origin()
 def download_link(job_id):
-    job = JOBS.get(job_id)
-    if not job or not job.get("zip") or not os.path.exists(job["zip"]):
-        return jsonify({"error": "Download not ready or expired."}), 410
-    
-    zip_filename = os.path.basename(job["zip"])
-    return jsonify({
-        "url": f"/download-direct/{job_id}/{zip_filename}"
-    })
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT zip_path FROM jobs WHERE id = ? AND status = 'done'", (job_id,))
+        row = c.fetchone()
+        conn.close()
+
+        if not row or not row["zip_path"] or not os.path.exists(row["zip_path"]):
+            return jsonify({"error": "Download not ready or expired."}), 410
+
+        zip_filename = os.path.basename(row["zip_path"])
+        return jsonify({
+            "url": f"/download-direct/{job_id}/{zip_filename}"
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 @app.route("/download-direct/<job_id>/<filename>")
 @cross_origin()
 def download_direct(job_id, filename):
-    job = JOBS.pop(job_id, None)
-    if not job:
-        return jsonify({"error": "Job not found."}), 404
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT zip_path FROM jobs WHERE id = ?", (job_id,))
+        row = c.fetchone()
+        conn.close()
 
-    path = os.path.join(TEMP_DIR, job_id, filename)
-    if not os.path.exists(path):
-        return jsonify({"error": "File missing."}), 410
+        if not row:
+            return jsonify({"error": "Job not found."}), 404
 
-    folder_to_delete = os.path.dirname(path)
-    active_downloading.add(job_id)
+        path = row["zip_path"]
+        if not path or not os.path.exists(path):
+            return jsonify({"error": "File missing."}), 410
 
-    response = make_response(send_file(path, as_attachment=True))
-    response.headers["Content-Type"] = mimetypes.guess_type(path)[0] or "application/zip"
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    response.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
+        folder_to_delete = os.path.dirname(path)
+        active_downloading.add(job_id)
 
-    def cleanup_job():
-        time.sleep(2)
-        active_downloading.discard(job_id)
-        shutil.rmtree(folder_to_delete, ignore_errors=True)
-        logger.info(f"Cleaned up temp folder: {folder_to_delete}")
+        response = make_response(send_file(path, as_attachment=True))
+        response.headers["Content-Type"] = mimetypes.guess_type(path)[0] or "application/zip"
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
 
-    threading.Thread(target=cleanup_job).start()
-    return response
+        def cleanup_job():
+            time.sleep(2)
+            active_downloading.discard(job_id)
+            shutil.rmtree(folder_to_delete, ignore_errors=True)
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+                conn.commit()
+                logger.info(f"[CLEANUP] Removed job {job_id} and temp folder.")
+            except Exception as e:
+                logger.error(f"[CLEANUP ERROR] Could not delete job {job_id}: {e}")
+            finally:
+                if conn:
+                    conn.close()
+
+        threading.Thread(target=cleanup_job).start()
+        return response
+
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
 
 
 
 @app.route("/preview/<job_id>/<stem>")
+@cross_origin()
 def preview(job_id, stem):
-    preview_dir = os.path.join(TEMP_DIR, job_id, "preview")
-    if not os.path.exists(preview_dir):
-        return jsonify({"error": "Preview not found or expired."}), 404
+    try:
+        # Validate job exists in DB first
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM jobs WHERE id = ?", (job_id,))
+        exists = c.fetchone()
+        conn.close()
+        if not exists:
+            return jsonify({"error": "Job not found."}), 404
 
-    mp3_path = os.path.join(preview_dir, f"{stem}.mp3")
-    if os.path.exists(mp3_path):
-        return send_file(mp3_path, mimetype="audio/mpeg")
+        # Sanitize stem name
+        stem = stem.lower()
+        valid_stems = {"vocals", "drums", "bass", "other", "no_vocals"}
+        if stem not in valid_stems:
+            return jsonify({"error": "Invalid stem requested."}), 400
 
-    wav_path = os.path.join(preview_dir, f"{stem}.wav")
-    # fallback: some pipelines write "no_vocals.wav" instead of "other.wav"
-    if stem == "other" and not os.path.exists(wav_path):
-        wav_path = os.path.join(preview_dir, "no_vocals.wav")
+        preview_dir = os.path.join(TEMP_DIR, job_id, "preview")
+        if not os.path.exists(preview_dir):
+            return jsonify({"error": "Preview not found or expired."}), 404
 
-    if os.path.exists(wav_path):
-        return send_file(wav_path, mimetype="audio/wav")
+        # Try .mp3 preview first
+        mp3_path = os.path.join(preview_dir, f"{stem}.mp3")
+        if os.path.exists(mp3_path):
+            return send_file(mp3_path, mimetype="audio/mpeg")
 
-    return jsonify({"error": "Stem not found."}), 404
+        # Fallback to .wav
+        wav_path = os.path.join(preview_dir, f"{stem}.wav")
+        if stem == "other" and not os.path.exists(wav_path):
+            wav_path = os.path.join(preview_dir, "no_vocals.wav")
+
+        if os.path.exists(wav_path):
+            return send_file(wav_path, mimetype="audio/wav")
+
+        return jsonify({"error": "Stem not found."}), 404
+
+    except Exception as e:
+        logger.error(f"[PREVIEW ERROR] {e}")
+        return jsonify({"error": "Server error."}), 500
+
 
 
 # SIGNUP
@@ -1074,8 +1162,12 @@ def handle_exception(e):
 def handle_413(e):
     return jsonify({"error": "File too large. Max allowed is 200MB."}), 413
 
-startup_cleanup()
-threading.Thread(target=preview_cleanup_loop, daemon=True).start()
+def run_once_on_master():
+    if os.getenv("RUN_MAIN") == "true":  # Gunicorn master only
+        startup_cleanup()
+        threading.Thread(target=preview_cleanup_loop, daemon=True).start()
+
+run_once_on_master()
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
