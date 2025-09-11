@@ -23,6 +23,9 @@ export async function uploadFile(file, selectedStems, onProgress, userEmail) {
 
     return res.data;
   } catch (err) {
+    if (err.response?.status === 413) {
+      throw new Error("File too large. Max allowed is 200MB.");
+    }
     throw new Error(err.response?.data?.error || "Upload failed.");
   }
 }
@@ -40,29 +43,35 @@ export function streamJob(jobId, onMessage) {
 
 export async function downloadZip(jobId, onError) {
   try {
-    const res = await axios.get(`${API_BASE}/download/${jobId}`, {
-      responseType: "blob"
+    // Step 1: ask backend for the actual link
+    const linkRes = await axios.get(`${API_BASE}/download-link/${jobId}`);
+    const { url } = linkRes.data; // e.g. "/download-direct/<job>/<file.zip>"
+
+    // Step 2: fetch the file as blob
+    const res = await axios.get(`${API_BASE}${url}`, {
+      responseType: "blob",
     });
 
+    // Step 3: same filename logic as before
     let filename = "download.zip";
     const header = res.headers["content-disposition"];
     if (header && header.includes("filename=")) {
       filename = header.split("filename=")[1].replace(/"/g, "");
     }
 
-    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement("a");
-    link.href = url;
+    link.href = blobUrl;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
-
+    window.URL.revokeObjectURL(blobUrl);
   } catch (err) {
     if (onError) onError("Download failed. Please try again.");
   }
 }
+
 
 // Stripe Checkout Session Creator
 export async function createCheckoutSession(email) {

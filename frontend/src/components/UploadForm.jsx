@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
-import { uploadFile, streamJob, downloadZip } from "../api";
+import { uploadFile, streamJob } from "../api";
 import axios from "axios";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext.jsx";
 
 export default function UploadForm() {
+  // Core upload state
   const [file, setFile] = useState(null);
   const [stems, setStems] = useState(["vocals", "other"]);
   const [status, setStatus] = useState("");
@@ -15,17 +16,35 @@ export default function UploadForm() {
   const [uploading, setUploading] = useState(false);
   const [evtSource, setEvtSource] = useState(null);
   const [error, setError] = useState("");
+
+  // Audio preview controls
   const waveRefs = useRef({});
   const [playingStates, setPlayingStates] = useState({});
   const [volumes, setVolumes] = useState({});
-  const { user } = useContext(AuthContext);
-  const [isPremium, setIsPremium] = useState(false);
   const [isPlayingAll, setIsPlayingAll] = useState(false);
 
-  // ✅ Usage state
-  const [usedMB, setUsedMB] = useState(0);
-  const [limitMB, setLimitMB] = useState(150);
+  // User context and premium status
+  const { user } = useContext(AuthContext);
+  const [isPremium, setIsPremium] = useState(false);
 
+  // Download preparation states
+  const [isZipReady, setIsZipReady] = useState(false);
+  const [isPreparingZip, setIsPreparingZip] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Usage tracking
+  const [usedMin, setUsedMin] = useState(0);
+  const [limitMin, setLimitMin] = useState(150);
+
+  // File validation state
+  const [isCheckingFile, setIsCheckingFile] = useState(false);
+
+  // Configuration constants
+  const POLLING_INTERVAL = 3000; // 3 seconds
+  const POLLING_TIMEOUT = 120000; // 2 minutes  
+  const USAGE_WARNING_THRESHOLD = 85; // 85%
+
+  // Fetch user usage data from backend
   const fetchUsage = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/usage`, {
@@ -33,9 +52,9 @@ export default function UploadForm() {
           ...(user?.email && { "X-User-Email": user.email })
         }
       });
-      setUsedMB(res.data.used_mb);
-      setLimitMB(res.data.limit_mb);
-      setIsPremium(res.data.is_premium); // 💎 NEW
+      setUsedMin(res.data.used_min);
+      setLimitMin(res.data.limit_min);
+      setIsPremium(res.data.is_premium);
     } catch (err) {
       console.error("Failed to fetch usage", err);
     }
@@ -45,14 +64,107 @@ export default function UploadForm() {
     fetchUsage();
   }, []);
 
+  // Get audio file duration before upload to check quota
+  const getAudioDuration = (file) => {
+    return new Promise((resolve, reject) => {
+      const audio = document.createElement('audio');
+      const url = URL.createObjectURL(file);
+
+      audio.addEventListener('loadedmetadata', () => {
+        URL.revokeObjectURL(url);
+        resolve(audio.duration);
+      });
+
+      audio.addEventListener('error', () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Could not load audio file'));
+      });
+
+      audio.src = url;
+    });
+  };
+
+  // Validate file against quota before allowing upload
+  const checkQuotaBeforeUpload = async (selectedFile) => {
+    setIsCheckingFile(true);
+    setError("");
+
+    try {
+      const durationSeconds = await getAudioDuration(selectedFile);
+      const durationMinutes = durationSeconds / 60;
+      const wouldExceedQuota = (usedMin + durationMinutes) > limitMin;
+      const remainingMin = limitMin - usedMin;
+
+      if (wouldExceedQuota) {
+        setError(
+          `Upload blocked: This ${durationMinutes.toFixed(1)}-minute file would exceed your ${limitMin}-minute limit. ${remainingMin.toFixed(1)} minutes remaining.`
+        );
+        setIsCheckingFile(false);
+        return false;
+      }
+
+      setIsCheckingFile(false);
+      return true;
+    } catch (err) {
+      console.error("Error checking file duration:", err);
+      setError("❌ Could not analyze audio file. Please ensure it's a valid audio format.");
+      setIsCheckingFile(false);
+      return false;
+    }
+  };
+
   const toggleStem = (stem) => {
     setStems((prev) =>
       prev.includes(stem) ? prev.filter((s) => s !== stem) : [...prev, stem]
     );
   };
 
+  // Check if processed files are ready for download
+  const checkZipStatus = async (jobId) => {
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/download-link/${jobId}`);
+      return response.status === 200 && response.data?.url;
+    } catch (err) {
+      if (err.response?.status === 404 || err.response?.status === 400) {
+        return false;
+      }
+      console.error("Failed to check zip status:", err);
+      return false;
+    }
+  };
+
+  // Poll backend until zip file is ready
+  const pollZipReadiness = (jobId) => {
+    setIsPreparingZip(true);
+
+    const pollInterval = setInterval(async () => {
+      const ready = await checkZipStatus(jobId);
+      if (ready) {
+        setIsZipReady(true);
+        setIsPreparingZip(false);
+        clearInterval(pollInterval);
+      }
+    }, POLLING_INTERVAL);
+
+    // Fallback timeout to prevent infinite polling
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (!isZipReady) {
+        console.log("Zip polling timeout - assuming ready");
+        setIsZipReady(true);
+        setIsPreparingZip(false);
+      }
+    }, POLLING_TIMEOUT);
+  };
+
+  // Main upload handler - validates quota then starts upload
   const startUpload = async (selectedFile) => {
     if (!selectedFile) return;
+
+    // Block upload if it would exceed quota
+    const canUpload = await checkQuotaBeforeUpload(selectedFile);
+    if (!canUpload) return;
+
     setFile(selectedFile);
     setUploading(true);
     setStatus("Uploading...");
@@ -60,7 +172,12 @@ export default function UploadForm() {
     setShowPreview(true);
     setError("");
 
-    console.log("Logged in as:", user?.email); 
+    // Reset download states for new upload
+    setIsZipReady(false);
+    setIsPreparingZip(false);
+    setIsDownloading(false);
+
+    console.log("Logged in as:", user?.email);
 
     let res;
     try {
@@ -68,7 +185,8 @@ export default function UploadForm() {
       if (!res?.job_id) throw new Error("No job ID received.");
     } catch (err) {
       console.error(err);
-      setError(err.message || "Upload failed. Please try again.");
+      const backendMsg = err.response?.data?.error || "Upload failed.";
+      setError(backendMsg);
       setUploading(false);
       return;
     }
@@ -76,13 +194,16 @@ export default function UploadForm() {
     setJobId(res.job_id);
     setStatus("Processing...");
 
+    // Listen for processing updates via server-sent events
     const es = streamJob(res.job_id, (msg) => {
       setStatus(msg);
       if (msg.includes("Job complete")) {
+        setStatus("Previews ready!");
         setTimeout(() => {
           setDone(true);
           setUploading(false);
-          fetchUsage(); // ✅ update usage after job finishes
+          fetchUsage(); // Refresh usage after processing
+          pollZipReadiness(res.job_id); // Start checking for zip
         }, 500);
       }
     });
@@ -90,9 +211,18 @@ export default function UploadForm() {
     setEvtSource(es);
   };
 
-  const handleDownload = () => {
-    if (jobId) {
-      downloadZip(jobId, (errMsg) => setError(errMsg));
+  // Handle final download and reset UI
+  const handleDownload = async () => {
+    if (!jobId || !isZipReady) return;
+
+    try {
+      setIsDownloading(true);
+
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/download-link/${jobId}`);
+      const downloadUrl = `${import.meta.env.VITE_BASE_URL}${res.data.url}`;
+
+      // Reset all state immediately for new upload
+      setIsDownloading(false);
       setFile(null);
       setJobId(null);
       setDone(false);
@@ -102,25 +232,39 @@ export default function UploadForm() {
       setUploading(false);
       setPlayingStates({});
       setVolumes({});
+      setIsZipReady(false);
+      setIsPreparingZip(false);
+
+      // Trigger browser download
+      window.location.href = downloadUrl;
+
+    } catch (err) {
+      setIsDownloading(false);
+      setError("Download failed. Try again.");
+      console.error(err);
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     console.log("FILE SELECTED");
     const selectedFile = e.target.files[0];
-    if (selectedFile) startUpload(selectedFile);
+    if (!selectedFile) return;
+
+    setError("");
+    await startUpload(selectedFile);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = async (e) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) startUpload(droppedFile);
+    if (droppedFile) await startUpload(droppedFile);
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
   };
 
+  // Cleanup event sources and waveforms on unmount
   useEffect(() => {
     return () => {
       if (evtSource) evtSource.close();
@@ -128,6 +272,7 @@ export default function UploadForm() {
     };
   }, [evtSource]);
 
+  // Create waveform visualization for each stem
   const createWaveform = (url, stem) => {
     const container = document.getElementById(`waveform-${stem}`);
     if (!container) return;
@@ -150,6 +295,7 @@ export default function UploadForm() {
     waveRefs.current[stem].load(url);
   };
 
+  // Initialize waveforms when preview is ready
   useEffect(() => {
     if (done && showPreview && jobId) {
       stems.forEach((stem) => {
@@ -159,6 +305,7 @@ export default function UploadForm() {
     }
   }, [done, showPreview, jobId]);
 
+  // Toggle play/pause for individual stems
   const toggleStemPlay = (stem) => {
     const ws = waveRefs.current[stem];
     if (!ws) return;
@@ -179,6 +326,7 @@ export default function UploadForm() {
     }
   };
 
+  // Handle volume slider drag interaction
   const startDrag = (stem, e) => {
     const bar = e.currentTarget;
 
@@ -202,7 +350,18 @@ export default function UploadForm() {
     window.addEventListener("mouseup", upHandler);
   };
 
-  const usagePercent = Math.min(100, Math.round((usedMB / limitMB) * 100));
+  const usagePercent = Math.min(100, Math.round((usedMin / limitMin) * 100));
+
+  // Determine download button state and styling
+  const getDownloadButtonState = () => {
+    if (!done) return { disabled: true, text: "Processing...", className: "bg-gray-600" };
+    if (isPreparingZip) return { disabled: true, text: "Preparing Download...", className: "bg-yellow-600" };
+    if (isZipReady && !isDownloading) return { disabled: false, text: "Download Zip", className: "bg-green-600 hover:bg-green-700" };
+    if (isDownloading) return { disabled: true, text: "Downloading...", className: "bg-blue-600" };
+    return { disabled: true, text: "Preparing...", className: "bg-gray-600" };
+  };
+
+  const downloadButtonState = getDownloadButtonState();
 
   return (
     <div
@@ -210,7 +369,7 @@ export default function UploadForm() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* 🌟 PREMIUM BADGE */}
+      {/* Premium account badge */}
       {isPremium && (
         <div className="w-full mb-6">
           <div className="relative w-full bg-[#1f1f1f] border border-yellow-500 rounded-xl shadow-lg px-6 py-3 flex items-center justify-between overflow-hidden">
@@ -227,56 +386,62 @@ export default function UploadForm() {
           </div>
         </div>
       )}
- 
-      {/* ✅ USAGE BAR */}
+
+      {/* Usage progress bar */}
       <div className="mb-4">
         <p className="text-sm text-gray-200 mb-1">
-          📊 Usage: {usedMB}MB / {limitMB}MB ({usagePercent}%)
+          📊 Usage: {usedMin} min / {limitMin} min ({usagePercent}%)
         </p>
         <div className="w-full h-3 bg-gray-600 rounded">
           <div
-            className={`h-3 rounded transition-all duration-300 ${
-              usagePercent < 60
-                ? "bg-green-500"
-                : usagePercent < 90
+            className={`h-3 rounded transition-all duration-300 ${usagePercent < 60
+              ? "bg-green-500"
+              : usagePercent < 90
                 ? "bg-yellow-400"
                 : "bg-red-500"
-            }`}
+              }`}
             style={{ width: `${usagePercent}%` }}
           ></div>
         </div>
-        {/* ⛔ Near-limit warning */}
-        {usagePercent >= 85 && (
+        {usagePercent >= USAGE_WARNING_THRESHOLD && (
           <p className="text-sm text-red-500 font-medium mt-1">
-            ⚠️ You’re close to your weekly limit!
+            ⚠️ You're close to your weekly limit!
           </p>
         )}
-
-        {/* 🕒 Reset info */}
         <p className="text-xs text-gray-400 mt-1">
           Usage resets every Monday at 12:00 AM (AEST)
         </p>
       </div>
-      
-      
-      {/* ERROR */}
+
+      {/* Error messages */}
       {error && (
         <div className="mb-4 p-3 bg-red-600 bg-opacity-80 rounded text-white text-sm">
           {error}
         </div>
       )}
 
-      {/* UPLOAD + STEMS */}
+      {/* File upload area and stem selection */}
       {!done && !uploading && (
         <>
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-lg cursor-pointer hover:border-indigo-400 transition">
-            <p className="text-gray-300 text-sm mb-2">
-              Drag & Drop or Click to Select a File
-            </p>
+          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition ${isCheckingFile
+            ? 'border-yellow-400 bg-yellow-50 bg-opacity-10'
+            : 'border-gray-500 hover:border-indigo-400'
+            }`}>
+            {isCheckingFile ? (
+              <div className="text-center">
+                <div className="animate-spin w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-yellow-300 text-sm">Analyzing file...</p>
+              </div>
+            ) : (
+              <p className="text-gray-300 text-sm mb-2">
+                Drag & Drop or Click to Select a File
+              </p>
+            )}
             <input
               type="file"
               onChange={handleFileSelect}
               className="hidden"
+              disabled={isCheckingFile}
             />
           </label>
 
@@ -288,7 +453,7 @@ export default function UploadForm() {
                   className="mr-2"
                   checked={stems.includes(stem)}
                   onChange={() => toggleStem(stem)}
-                  disabled={uploading || jobId !== null}
+                  disabled={uploading || jobId !== null || isCheckingFile}
                 />
                 {stem.charAt(0).toUpperCase() + stem.slice(1)}
               </label>
@@ -297,7 +462,7 @@ export default function UploadForm() {
         </>
       )}
 
-      {/* LOADING */}
+      {/* Processing animation */}
       {uploading && !done && (
         <div className="flex flex-col items-center justify-center mt-8">
           <div className="flex space-x-1 h-8">
@@ -331,16 +496,17 @@ export default function UploadForm() {
         </div>
       )}
 
-      {/* DOWNLOAD + PREVIEW */}
+      {/* Download section with preview */}
       {done && (
         <div className="mt-6">
           <button
             onClick={handleDownload}
-            className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium"
+            disabled={downloadButtonState.disabled}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${downloadButtonState.className} ${downloadButtonState.disabled ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+              }`}
           >
-            Download Stems
+            {downloadButtonState.text}
           </button>
-
 
           {showPreview && (
             <div className="mt-6 bg-gray-900 p-4 rounded-lg">
@@ -364,13 +530,12 @@ export default function UploadForm() {
                 </button>
               </div>
 
-
+              {/* Individual stem controls with waveforms */}
               {stems.map((stem) => (
                 <div key={stem} className="mb-6 flex items-center space-x-3">
                   <div className="min-w-[60px] text-sm text-white font-medium capitalize">
                     {stem}
                   </div>
-
 
                   <button
                     onClick={() => {
@@ -393,13 +558,12 @@ export default function UploadForm() {
                     </svg>
                   </button>
 
-
                   <div
                     id={`waveform-${stem}`}
                     className="flex-1 bg-black rounded"
                   ></div>
 
-
+                  {/* Volume slider */}
                   <div
                     className="relative w-8 h-32 bg-gray-700 rounded-lg cursor-pointer flex flex-col justify-end items-center overflow-hidden"
                     onMouseDown={(e) => startDrag(stem, e)}

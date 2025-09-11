@@ -50,7 +50,7 @@ export default function Dashboard() {
                                         <span className="text-gray-400">{item.date}</span>
                                     </div>
                                     <div className="mt-1 text-gray-300">
-                                        <span className="font-medium text-indigo-400">{item.stems}</span> • {item.size}MB
+                                        <span className="font-medium text-indigo-400">{item.stems}</span> • {item.duration} min
                                     </div>
                                 </div>
                             ))}
