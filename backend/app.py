@@ -14,12 +14,12 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from disposable_email_domains import blocklist
-from datetime import datetime, timedelta
 from utils.email_utils import send_email
 from zoneinfo import ZoneInfo
 
+UTC = timezone.utc
 
 app = Flask(__name__)
 aest = datetime.now(pytz.timezone("Australia/Sydney")).date()
@@ -322,17 +322,6 @@ def upload():
             if conn:
                 conn.close()
 
-    if is_guest:
-        weekly_usage = get_guest_weekly_usage(ip)
-        cap = 150
-    else:
-        weekly_usage, cap = get_account_weekly_usage(user_id)
-
-    if weekly_usage + file_size_mb > cap:
-        return jsonify({
-            "error": f"Weekly limit exceeded ({cap}MB max). You’ve used {round(weekly_usage, 2)}MB."
-        }), 403
-
     selected_stems = request.form.getlist("stems") or ["vocals", "other"]
     job_id = str(uuid.uuid4())
     active_processing.add(job_id)
@@ -365,13 +354,26 @@ def upload():
         upload_path = wav_path
         log(job_id, "Extracted audio from MP4.")
 
+    duration_min = round(duration / 60, 2)
+
+    if is_guest:
+        weekly_usage = get_guest_weekly_usage(ip)
+        cap = 10  # ⏱ 10 min/week for guests (adjust if needed)
+    else:
+        weekly_usage, cap = get_account_weekly_usage(user_id)
+
+    if weekly_usage + duration_min > cap:
+        return jsonify({
+            "error": f"Weekly limit exceeded ({cap} min max). You've used {round(weekly_usage, 2)} min."
+        }), 403
+
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         upload_date = time.strftime("%Y-%m-%d")
         c.execute(
-            "INSERT INTO usage (user_id, ip, date, mb_used, filename, stems) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, ip, upload_date, file_size_mb, filename, ",".join(selected_stems))
+            "INSERT INTO usage (user_id, ip, date, duration_min, filename, stems) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, ip, upload_date, duration_min, filename, ",".join(selected_stems))
         )
         conn.commit()
     except Exception as e:
@@ -380,7 +382,6 @@ def upload():
         if conn:
             conn.close()
 
-    # ✅ Insert job into DB
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -397,6 +398,7 @@ def upload():
 
     threading.Thread(target=process_job, args=(job_id, upload_path, filename, selected_stems)).start()
     return jsonify({"job_id": job_id})
+
 
 
 
@@ -591,7 +593,7 @@ def signup():
 
     # Generate token
     token = secrets.token_urlsafe(32)
-    expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(hours=24)).isoformat()
     c.execute('''
         INSERT INTO verification_tokens (user_id, token, expires_at, used)
         VALUES (?, ?, ?, 0)
@@ -669,7 +671,7 @@ def job_history():
 
     user_id = user["id"]
     c.execute("""
-        SELECT date, filename, stems, mb_used
+        SELECT date, filename, stems, duration_min
         FROM usage
         WHERE user_id = ?
         ORDER BY id DESC
@@ -682,10 +684,11 @@ def job_history():
         "date": row["date"],
         "filename": row["filename"],
         "stems": row["stems"],
-        "size": row["mb_used"]
+        "duration": round(row["duration_min"], 2)
     } for row in rows]
 
-    return jsonify(history)    
+    return jsonify(history)
+
 
 @app.route("/verify-email", methods=["GET"])
 @cross_origin()
@@ -710,7 +713,7 @@ def verify_email():
             conn.close()
             return jsonify({"error": "This token has already been used."}), 400
 
-        if datetime.utcnow() > datetime.fromisoformat(expires_at):
+        if datetime.now(UTC) > datetime.fromisoformat(expires_at):
             conn.close()
             return jsonify({"error": "Token has expired."}), 400
 
@@ -749,7 +752,7 @@ def reset_password_request():
 
     # Create reset token
     token = secrets.token_urlsafe(32)
-    expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
 
     c.execute('''
         INSERT INTO password_reset_tokens (user_id, token, expires_at, used)
@@ -762,7 +765,7 @@ def reset_password_request():
     # Normally send email
     reset_link = f"{BASE_URL}/reset-password-confirm/{token}"
     html_body = f"""
-    <h3>Password Reset Requested 🔐</h3>
+    <h3>Password Reset Requested 🔒</h3>
     <p>If you didn't request this, ignore it. Otherwise click below to reset your password:</p>
     <a href="{reset_link}">Reset Password</a>
     """
@@ -775,41 +778,6 @@ def reset_password_request():
     }), 200
 
 
-    
-@app.route("/request-password-reset", methods=["POST"])
-def request_password_reset():
-    data = request.get_json()
-    email = data.get("email")
-
-    if not email:
-        return jsonify({"error": "Email is required."}), 400
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, is_verified FROM users WHERE email = ?", (email,))
-    user = c.fetchone()
-
-    if not user:
-        conn.close()
-        return jsonify({"error": "No user found with that email."}), 404
-
-    if user["is_verified"] == 0:
-        conn.close()
-        return jsonify({"error": "Please verify your email before resetting password."}), 403
-
-    token = secrets.token_urlsafe(32)
-    expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
-
-    c.execute('''
-        INSERT INTO password_reset_tokens (user_id, token, expires_at)
-        VALUES (?, ?, ?)
-    ''', (user["id"], token, expires_at))
-
-    conn.commit()
-    conn.close()
-
-    print(f"DEBUG: Password reset link → http://localhost:3000/reset-password/{token}")
-    return jsonify({"message": "Reset link sent (check console)."}), 200
 
 @app.route("/reset-password-confirm/<token>", methods=["POST"])
 def reset_password(token):
@@ -836,7 +804,7 @@ def reset_password(token):
         conn.close()
         return jsonify({"error": "This reset link has already been used."}), 400
 
-    if datetime.utcnow() > datetime.fromisoformat(record["expires_at"]):
+    if datetime.now(UTC) > datetime.fromisoformat(record["expires_at"]):
         conn.close()
         return jsonify({"error": "This reset link has expired."}), 400
 
@@ -859,16 +827,12 @@ def get_guest_weekly_usage(ip):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        # For zoneinfo
         now = datetime.now(ZoneInfo("Australia/Sydney"))
-        # OR for pytz
-        # now = datetime.now(pytz.timezone("Australia/Sydney"))
-
         start_of_week = now.date() - timedelta(days=now.weekday())
         start_of_week_str = start_of_week.isoformat()
 
         c.execute("""
-            SELECT SUM(mb_used) FROM usage
+            SELECT SUM(duration_min) FROM usage
             WHERE ip = ? AND user_id IS NULL AND date >= ?
         """, (ip, start_of_week_str))
 
@@ -880,47 +844,40 @@ def get_guest_weekly_usage(ip):
     finally:
         if conn:
             conn.close()
-    
+
+
 def get_account_weekly_usage(user_id):
     try:
         db_path = os.path.join(os.path.dirname(__file__), "db", "users.db")
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        # For zoneinfo
         now = datetime.now(ZoneInfo("Australia/Sydney"))
-        # OR for pytz
-        # now = datetime.now(pytz.timezone("Australia/Sydney"))
-
         start_of_week = now.date() - timedelta(days=now.weekday())
         start_of_week_str = start_of_week.isoformat()
 
-        # Fetch is_premium
         c.execute("SELECT is_premium FROM users WHERE id = ?", (user_id,))
         is_premium = c.fetchone()
         is_premium = is_premium[0] if is_premium else 0
 
-        # Fetch usage
         c.execute("""
-            SELECT SUM(mb_used) FROM usage
+            SELECT SUM(duration_min) FROM usage
             WHERE user_id = ? AND date >= ?
         """, (user_id, start_of_week_str))
 
         used = c.fetchone()[0] or 0
-        limit = 2000 if is_premium else 300
+        limit = 120 if is_premium else 30
 
         return used, limit
 
     except Exception as e:
         print("Failed to fetch account usage:", e)
-        return 0, 300  # fallback
-
+        return 0, 30
     finally:
         if conn:
             conn.close()
 
 
-    
 @app.route("/usage", methods=["GET"])
 @cross_origin()
 def usage():
@@ -928,7 +885,7 @@ def usage():
     email = request.headers.get("X-User-Email")
     is_guest = True
     user_id = None
-    limit = 150
+    limit = 10  # default for guests
     used = 0
 
     try:
@@ -936,7 +893,7 @@ def usage():
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
 
-        start_of_week = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+        start_of_week = datetime.now(UTC).date() - timedelta(days=datetime.now(UTC).weekday())
         start_of_week_str = start_of_week.isoformat()
 
         if email:
@@ -948,38 +905,40 @@ def usage():
 
         if is_guest:
             c.execute("""
-                SELECT SUM(mb_used) FROM usage
+                SELECT SUM(duration_min) FROM usage
                 WHERE ip = ? AND user_id IS NULL AND date >= ?
             """, (ip, start_of_week_str))
             used = c.fetchone()[0] or 0
-            limit = 150
+            limit = 10
+            is_premium = False
         else:
             c.execute("SELECT id, is_premium FROM users WHERE email = ?", (email,))
             result = c.fetchone()
             if result:
                 user_id, is_premium = result
-                limit = 2000 if is_premium else 300
+                limit = 120 if is_premium else 30
 
                 c.execute("""
-                    SELECT SUM(mb_used) FROM usage
+                    SELECT SUM(duration_min) FROM usage
                     WHERE user_id = ? AND date >= ?
                 """, (user_id, start_of_week_str))
                 used = c.fetchone()[0] or 0
             else:
                 used = 0
-                limit = 300  # fallback
+                limit = 30
+                is_premium = False
 
         return jsonify({
-            "used_mb": round(used, 2),
-            "limit_mb": limit,
+            "used_min": round(used, 2),
+            "limit_min": limit,
             "is_premium": bool(is_premium) if not is_guest else False
         })
 
     except Exception as e:
         return jsonify({"error": "Failed to fetch usage"}), 500
-    finally:
-        if conn:
-            conn.close()
+        
+        
+
 
 @app.route("/promote-to-premium", methods=["POST"])
 @cross_origin()
@@ -1098,7 +1057,7 @@ def stripe_webhook():
             <p>Hi {email},</p>
             <p>Your premium upgrade was successful. You now have access to:</p>
             <ul>
-              <li>🔓 Higher upload limits</li>
+              <li>📈 Higher upload limits</li>
               <li>⚡ Faster splitting</li>
               <li>🚀 Priority feature access</li>
             </ul>
@@ -1186,4 +1145,3 @@ app.config['SESSION_COOKIE_SECURE'] = os.getenv("COOKIE_SECURE", "true").lower()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-    

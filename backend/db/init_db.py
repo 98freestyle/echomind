@@ -25,7 +25,7 @@ c.execute('''
         user_id INTEGER,
         ip TEXT,
         date TEXT,
-        mb_used INTEGER,
+        duration_min REAL,
         filename TEXT,
         stems TEXT
     )
