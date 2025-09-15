@@ -1404,4 +1404,4 @@ app.config['SESSION_COOKIE_SECURE'] = os.getenv("COOKIE_SECURE", "true").lower()
 # ============================================================
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
