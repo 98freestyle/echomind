@@ -49,6 +49,7 @@ LOG_FILE = os.getenv("LOG_FILE", "logs/app.log")
 JOB_EXPIRATION = int(os.getenv("JOB_EXPIRATION", 300))  # seconds
 BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
 
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -1149,12 +1150,19 @@ def usage():
 # Premium / Stripe Integration
 # ============================================================
 
+
 @app.route("/promote-to-premium", methods=["POST"])
 @cross_origin()
 def promote_to_premium():
     """
-    Manually promote a user to premium (admin/debug).
+    Manually promote a user to premium (admin-only via token).
     """
+    # --- Admin token check ---
+    token = request.headers.get("X-ADMIN-TOKEN")
+    if token != ADMIN_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    # --- Extract email ---
     data = request.get_json()
     email = data.get("email")
     if not email:
@@ -1165,6 +1173,7 @@ def promote_to_premium():
         conn = get_db_connection()
         c = conn.cursor()
 
+        # --- Check if user exists ---
         c.execute("SELECT is_premium FROM users WHERE email = ?", (email,))
         result = c.fetchone()
         if not result:
@@ -1172,16 +1181,18 @@ def promote_to_premium():
         if result[0] == 1:
             return jsonify({"message": f"{email} is already a premium user."}), 200
 
+        # --- Promote user ---
         c.execute("UPDATE users SET is_premium = 1 WHERE email = ?", (email,))
         conn.commit()
         return jsonify({"success": True, "message": f"{email} promoted to premium."}), 200
+
     except Exception as e:
         logger.error(f"Promote to premium error: {e}")
         return jsonify({"error": f"Server error: {str(e)}"}), 500
+
     finally:
         if conn:
             conn.close()
-
 
 @app.route("/create-checkout-session", methods=["POST"])
 @cross_origin()

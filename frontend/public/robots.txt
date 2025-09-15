@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password-request
+Disallow: /reset-password-confirm
+Disallow: /premium-success
+Disallow: /verified
+Allow: /
+Sitemap: https://echomind.cloud/sitemap.xml

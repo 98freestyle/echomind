@@ -21,7 +21,7 @@ def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None
     if stem_type == "2stems":
         model_args = ["--two-stems", "vocals"]
 
-    command = ["demucs", input_path, "-o", output_dir] + model_args
+    command = ["/home/echomind/EchoMind/backend/venv/bin/demucs", input_path, "-o", output_dir] + model_args
 
     if logger:
         logger.info(f"[{job_id}] Demucs process starting (CPU)...")
