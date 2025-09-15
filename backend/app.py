@@ -717,14 +717,14 @@ def signup():
         c = conn.cursor()
 
         ip = get_client_ip()
-        # NOTE: Disabled locally for testing.
-        # Uncomment to enforce per-IP signup limits:
-        # c.execute("""
-        #     SELECT * FROM signup_attempts
-        #     WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
-        # """, (ip,))
-        # if c.fetchone():
-        #     return jsonify({"error": "Too many signups from this IP. Try again in 7 days."}), 429
+        c.execute("""
+            SELECT * FROM signup_attempts
+            WHERE ip_address = ? AND attempted_at >= datetime('now', '-7 days')
+        """, (ip,))
+
+        if c.fetchone():
+            return jsonify({"error": "Too many signups from this IP. Try again in 7 days."}), 429
+
 
         # Ensure email not already taken
         c.execute("SELECT * FROM users WHERE email = ?", (email,))
@@ -890,6 +890,44 @@ def verify_email():
     finally:
         if conn:
             conn.close()
+
+# ============================================================
+# Support / Contact
+# ============================================================
+
+@app.route("/support-request", methods=["POST"])
+def support_request():
+    """
+    Handle support contact form submissions from frontend.
+    - Accepts name, email, and message
+    - Logs the request
+    - Sends to support inbox
+    """
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip()
+    message = data.get("message", "").strip()
+
+    if not name or not email or not message:
+        return jsonify({"error": "All fields are required."}), 400
+
+    logger.info(f"[SUPPORT] {name} <{email}>: {message}")
+
+    # Construct HTML email body
+    html_body = f"""
+    <h3>New Support Request</h3>
+    <p><strong>Name:</strong> {name}</p>
+    <p><strong>Email:</strong> {email}</p>
+    <p><strong>Message:</strong></p>
+    <p>{message}</p>
+    """
+
+    try:
+        send_email("support@echomind.cloud", f"Support request from {name}", html_body)
+        return jsonify({"success": True, "message": "Your request has been sent. We'll get back to you shortly."})
+    except Exception as e:
+        logger.error(f"Support request email error: {e}")
+        return jsonify({"error": "Failed to send support request."}), 500
 
     
 # ============================================================
