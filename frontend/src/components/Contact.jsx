@@ -8,7 +8,7 @@ export default function Contact() {
   const [loading, setLoading] = useState(false);
 
   // ------------------------------------------------------------
-  // Handle form submission → POST to backend support endpoint
+  // Send the form to the backend support endpoint
   // ------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();

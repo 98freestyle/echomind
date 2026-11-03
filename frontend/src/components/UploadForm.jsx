@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { uploadFile, streamJob } from "../api";
 import axios from "axios";
-import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext.jsx";
 
 export default function UploadForm() {
@@ -34,7 +33,7 @@ export default function UploadForm() {
 
   // Usage tracking
   const [usedMin, setUsedMin] = useState(0);
-  const [limitMin, setLimitMin] = useState(150);
+  const [limitMin, setLimitMin] = useState(10);
 
   // File validation state
   const [isCheckingFile, setIsCheckingFile] = useState(false);
@@ -177,8 +176,6 @@ export default function UploadForm() {
     setIsPreparingZip(false);
     setIsDownloading(false);
 
-    console.log("Logged in as:", user?.email);
-
     let res;
     try {
       res = await uploadFile(selectedFile, stems, null, user?.email);
@@ -246,7 +243,6 @@ export default function UploadForm() {
   };
 
   const handleFileSelect = async (e) => {
-    console.log("FILE SELECTED");
     const selectedFile = e.target.files[0];
     if (!selectedFile) return;
 
@@ -380,9 +376,8 @@ export default function UploadForm() {
               </span>
             </div>
             <span className="text-xs text-yellow-500 italic">
-              3GB Limit • Priority Queue • Clean Audio Previews
+              120 minutes per week
             </span>
-            <div className="absolute inset-0 pointer-events-none opacity-5 bg-[url('/gold-texture.png')] bg-cover bg-center" />
           </div>
         </div>
       )}
@@ -469,30 +464,17 @@ export default function UploadForm() {
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
-                className="w-2 bg-indigo-500 rounded animate-pulse"
+                className="w-2 bg-indigo-500 rounded animate-wave"
                 style={{
                   animationDelay: `${i * 0.15}s`,
                   animationDuration: "1s",
                   height: "100%",
                   transformOrigin: "center bottom",
-                  animationName: "wavePulse",
                 }}
               />
             ))}
           </div>
           <p className="mt-4 text-gray-300 text-sm">{status}</p>
-
-          <style>
-            {`
-              @keyframes wavePulse {
-                0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
-                50% { transform: scaleY(1); opacity: 1; }
-              }
-              .animate-pulse {
-                animation: wavePulse 1s ease-in-out infinite;
-              }
-            `}
-          </style>
         </div>
       )}
 

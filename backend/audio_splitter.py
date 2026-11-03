@@ -1,15 +1,28 @@
 """
 audio_splitter.py
 -----------------
-Handles audio separation using Demucs.
-Supports both local CPU splitting and GPU splitting via remote container.
+Handles audio separation using Demucs (CPU).
 """
 
 import os
-import subprocess
-import uuid
 import shutil
-import requests
+import subprocess
+import sys
+
+
+def _demucs_bin():
+    """
+    Find the demucs executable: DEMUCS_BIN if set, otherwise the one installed
+    next to the running Python (the venv), otherwise whatever is on PATH.
+    """
+    configured = os.getenv("DEMUCS_BIN")
+    if configured:
+        return configured
+    venv_bin = os.path.join(os.path.dirname(sys.executable), "demucs")
+    if os.path.exists(venv_bin):
+        return venv_bin
+    return shutil.which("demucs") or "demucs"
+
 
 def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None, logger=None):
     """
@@ -21,7 +34,7 @@ def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None
     if stem_type == "2stems":
         model_args = ["--two-stems", "vocals"]
 
-    command = ["/home/echomind/EchoMind/backend/venv/bin/demucs", input_path, "-o", output_dir] + model_args
+    command = [_demucs_bin(), input_path, "-o", output_dir] + model_args
 
     if logger:
         logger.info(f"[{job_id}] Demucs process starting (CPU)...")
@@ -43,42 +56,3 @@ def split_audio(input_path, output_dir="separated", stem_type="all", job_id=None
         logger.info(f"[{job_id}] Demucs wrote to: {os.path.join(output_dir, model_output_dir)}")
 
     return output_path
-
-
-# def split_via_gpu(input_path, selected_stems=None, job_id=None, logger=None):
-#     """
-#     Sends the file to the remote GPU container to process via Demucs.
-#     Returns the path to the saved ZIP file with stems.
-#     """
-#     if logger:
-#         logger.info(f"[{job_id}] Sending job to GPU pod...")
-#
-#     gpu_url = "http://YOUR_GPU_IP:5000/split"  # 🔁 Replace with real IP/URL
-#     files = {"file": open(input_path, "rb")}
-#     data = [("stems", s) for s in (selected_stems or ["vocals", "other"])]
-#
-#     try:
-#         res = requests.post(gpu_url, files=files, data=data, timeout=120)
-#         if res.status_code != 200:
-#             raise Exception(f"GPU split failed: {res.text}")
-#
-#         # Save to temp dir
-#         base_dir = os.path.join("temp", job_id or str(uuid.uuid4()))
-#         os.makedirs(base_dir, exist_ok=True)
-#         zip_path = os.path.join(base_dir, "stems.zip")
-#         with open(zip_path, "wb") as f:
-#             f.write(res.content)
-#
-#         if logger:
-#             logger.info(f"[{job_id}] GPU split complete. ZIP saved to {zip_path}")
-#
-#         return zip_path
-#
-#     except Exception as e:
-#         if logger:
-#             logger.error(f"[{job_id}] GPU split error: {e}")
-#         raise
-#
-#     finally:
-#         files["file"].close()
-

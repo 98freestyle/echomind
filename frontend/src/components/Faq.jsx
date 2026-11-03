@@ -4,11 +4,11 @@ export default function Faq() {
     const faqs = [
         {
             q: "What is EchoMind?",
-            a: "EchoMind lets you split any song into clean, studio-quality stems, directly in your browser. No login required.",
+            a: "EchoMind lets you split any song into clean stems directly in your browser. No login required.",
         },
         {
             q: "Do I need an account?",
-            a: "Nope! You can upload anonymously as a guest. Creating an account unlocks more weekly usage, and premium users unlock even higher limits plus priority speed.",
+            a: "Nope! You can upload as a guest. Creating an account unlocks more weekly usage, and Premium unlocks the highest limit.",
         },
         {
             q: "What file types are supported?",
@@ -16,11 +16,11 @@ export default function Faq() {
         },
         {
             q: "What stems can I choose?",
-            a: "You can pick any combo of vocals, drums, bass, and other. We use advanced fallback logic to ensure 'other' always works, even if the model fails.",
+            a: "You can pick any combination of vocals, drums, bass, and other.",
         },
         {
             q: "Is there a file size or length limit?",
-            a: "Yes. Tracks must be under 200MB and less than 10 minutes long. Larger files will be rejected during upload.",
+            a: "Yes. Tracks must be under 10 minutes long, and uploads are capped at 100MB by default.",
         },
         {
             q: "Can I preview stems before downloading?",
@@ -28,15 +28,15 @@ export default function Faq() {
         },
         {
             q: "How long does it take to process a file?",
-            a: "Depends on the file length. A 5 minute file may take up to 2 minutes max, but files under 2 minutes typically take 30–60 seconds. Premium users are prioritized in the queue and are always processed first.",
+            a: "It depends on the length of the track. Short tracks usually take under a minute, longer ones a few minutes.",
         },
         {
             q: "What are the weekly usage caps?",
-            a: "Guests get 150MB/week, verified users get 300MB/week, and Premium accounts get 3GB/week. Usage resets every Monday at 12:00 AM AEST.",
+            a: "Guests get 10 minutes of audio per week, verified accounts get 30 minutes, and Premium accounts get 120 minutes. Usage resets every Monday at 12:00 AM AEST.",
         },
         {
             q: "Do you store my audio?",
-            a: "No. All uploads and processed stems auto-delete after 5 minutes or once downloaded. We do not save any audio or personal data.",
+            a: "No. All uploads and processed stems are deleted automatically after 5 minutes or once downloaded.",
         },
         {
             q: "Can I use this for commercial projects?",

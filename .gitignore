@@ -31,3 +31,6 @@ backend/models/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# Local database
+backend/db/*.db

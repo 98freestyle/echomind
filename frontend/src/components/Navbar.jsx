@@ -31,7 +31,7 @@ export default function Navbar() {
           <nav className="hidden md:flex justify-center space-x-6 text-white">
             <Link to="/" className="hover:text-gray-300">Home</Link>
             <Link to="/faq" className="hover:text-gray-300">FAQ</Link>
-            <Link to="/contact" className="...">Contact</Link>
+            <Link to="/contact" className="hover:text-gray-300">Contact</Link>
             {user && <Link to="/dashboard" className="hover:text-gray-300">Dashboard</Link>}
           </nav>
 
@@ -130,11 +130,7 @@ export default function Navbar() {
               <ul className="text-sm space-y-2">
                 <li className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-500"></span>
-                  Unlock 2GB/week processing quota
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
-                  Priority job queue (premium goes first)
+                  120 minutes of processing per week
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>

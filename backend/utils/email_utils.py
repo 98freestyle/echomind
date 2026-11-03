@@ -14,4 +14,4 @@ def send_email(to_email, subject, html_content):
     with smtplib.SMTP_SSL(os.getenv("MAIL_SERVER"), int(os.getenv("MAIL_PORT"))) as server:
         server.login(os.getenv("MAIL_USERNAME"), os.getenv("MAIL_PASSWORD"))
         server.send_message(msg)
-        print(f"✅ Email sent to {to_email}")
+        print(f"Email sent to {to_email}")

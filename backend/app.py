@@ -31,12 +31,12 @@ from zoneinfo import ZoneInfo
 UTC = timezone.utc
 app = Flask(__name__)
 
+# Load environment variables
+load_dotenv()
+
 # CORS
 cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
 CORS(app, supports_credentials=True, origins=cors_origins)
-
-# Load environment variables
-load_dotenv()
 
 # Limits & config
 MAX_CONTENT_LENGTH_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", 100))
@@ -306,7 +306,7 @@ def process_job(job_id, upload_path, filename, selected_stems):
             if conn:
                 conn.close()
     finally:
-        # 🔒 mark job finished
+        # Mark job finished
         with job_state_lock:
             active_processing.discard(job_id)
 
@@ -383,7 +383,7 @@ def upload():
         return jsonify({"error": "Unsupported file type."}), 400
 
     ip = get_client_ip()
-    logger.debug(f"Client IP: {ip}")   # switched from print → logger
+    logger.debug(f"Client IP: {ip}")
     rate_limit_msg = is_rate_limited(ip)
     if rate_limit_msg:
         return jsonify({"error": rate_limit_msg}), 429
@@ -440,7 +440,7 @@ def upload():
             active_processing.discard(job_id)
         return jsonify({"error": "Invalid or corrupted audio file."}), 400
 
-    # Extract audio from MP4 → WAV
+    # Extract audio from MP4 to WAV
     if Path(filename).suffix.lower() == ".mp4":
         wav_path = os.path.join(temp_upload_dir, f"{Path(filename).stem}.wav")
         cmd = ["ffmpeg", "-i", upload_path, "-vn", "-acodec", "pcm_s16le", wav_path, "-y"]
@@ -1389,7 +1389,7 @@ def handle_exception(e):
 @app.errorhandler(413)
 def handle_413(e):
     """Extra handler for HTTP 413 (payload too large)."""
-    return jsonify({"error": "File too large. Max allowed is 200MB."}), 413
+    return jsonify({"error": f"File too large. Max {MAX_CONTENT_LENGTH_MB}MB."}), 413
 
 
 # ============================================================
@@ -1421,7 +1421,6 @@ def serve_react(path):
     Serve React frontend from built dist folder.
     Falls back to index.html for unknown paths.
     """
-    from flask import send_from_directory
     base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
     if path != "" and os.path.exists(os.path.join(base_path, path)):
         return send_from_directory(base_path, path)

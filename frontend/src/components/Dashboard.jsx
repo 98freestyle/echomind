@@ -27,9 +27,6 @@ export default function Dashboard() {
                 <p className="text-gray-300">
                     You’re logged in and ready to start splitting tracks.
                 </p>
-                <p className="text-sm text-gray-500 mt-2 italic">
-                    This page is protected — only verified users can access it.
-                </p>
 
                 {/* Job History Section */}
                 <div className="mt-10 text-left">

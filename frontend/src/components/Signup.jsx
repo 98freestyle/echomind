@@ -110,27 +110,15 @@ export default function Signup() {
                             {[...Array(5)].map((_, i) => (
                                 <div
                                     key={i}
-                                    className="w-1 bg-white rounded animate-pulse"
+                                    className="w-1 bg-white rounded animate-wave"
                                     style={{
                                         animationDelay: `${i * 0.15}s`,
                                         animationDuration: "1s",
                                         height: "100%",
                                         transformOrigin: "center bottom",
-                                        animationName: "wavePulse"
                                     }}
                                 />
                             ))}
-                            <style>
-                                {`
-                                  @keyframes wavePulse {
-                                    0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
-                                    50% { transform: scaleY(1); opacity: 1; }
-                                  }
-                                  .animate-pulse {
-                                    animation: wavePulse 1s ease-in-out infinite;
-                                  }
-                                `}
-                            </style>
                         </div>
                     ) : "Sign Up"}
                 </button>
