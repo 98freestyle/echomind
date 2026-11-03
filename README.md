@@ -31,6 +31,22 @@ Upload a track, choose your stems, and EchoMind runs it through Meta's Demucs AI
 3. The browser follows the job over a server sent events stream and loads the previews when it finishes.
 4. Once downloaded, or after a timeout, the job's files are deleted.
 
+## Project structure
+
+```
+backend/
+  app.py              Entry point: creates the app and registers the routes
+  config.py           Settings loaded from .env
+  db.py               SQLite connection helper
+  audio_splitter.py   Runs Demucs
+  routes/             HTTP endpoints (jobs, auth, usage, payments, support)
+  services/           Job processing, cleanup and usage calculations
+  utils/              Email sending and request helpers
+frontend/
+  src/components/     React pages and UI
+  src/context/        Logged in user state
+```
+
 ## Running locally
 
 Requires Python 3.12, Node 18+ and ffmpeg.
